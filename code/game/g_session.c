@@ -24,7 +24,7 @@ void G_WriteClientSessionData( gclient_t *client ) {
 	const char	*s;
 	const char	*var;
 
-	s = va("%i %i %i %i %i %i %i %i %i %i", 
+	s = va("%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i", 
 		client->sess.sessionTeam,
 		client->sess.spectatorTime,
 		client->sess.spectatorState,
@@ -34,7 +34,36 @@ void G_WriteClientSessionData( gclient_t *client ) {
 		client->sess.teamLeader,
 		client->sess.setForce,
 		client->sess.saberLevel,
-		client->sess.selectedFP
+		client->sess.selectedFP,
+
+		//By PowTecH - Account
+		client->sess.password,
+		client->sess.thisconnectuc,
+		client->sess.userlogged,
+		client->sess.displayName,
+		client->sess.logintrys,
+		client->sess.powerLevel,
+		client->sess.powerBit,
+
+		//By PowTecH - Stats
+		client->sess.sDuelW,
+		client->sess.sDuelL,
+		client->sess.sK,
+		client->sess.sD,
+		client->sess.sTime,
+
+		//By PowTecH - RPG
+		client->sess.money,
+
+		//By PowTecH - Flair
+		client->sess.emoteBit,
+
+		//By PowTecH - Ads
+		client->sess.lastAd,
+
+		//By PowTecH - queue
+		client->sess.queueNum,
+		client->sess.queueTeam
 		);
 
 	var = va( "session%i", (int)(client - level.clients) );
@@ -68,11 +97,16 @@ void G_ReadSessionData( gclient_t *client ) {
 	int spectatorState;
 	int sessionTeam;
 	int setForce;
+	//By PowTecH -
+	int userlogged;
+	int displayName;
+	int powerBit;
+	int emoteBit;
 
 	var = va( "session%i", (int)(client - level.clients) );
 	trap_Cvar_VariableStringBuffer( var, s, sizeof(s) );
 
-	sscanf( s, "%i %i %i %i %i %i %i %i %i %i",
+	sscanf( s, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i",
 		&sessionTeam,                 // bk010221 - format
 		&client->sess.spectatorTime,
 		&spectatorState,              // bk010221 - format
@@ -82,7 +116,36 @@ void G_ReadSessionData( gclient_t *client ) {
 		&teamLeader,                   // bk010221 - format
 		&setForce,
 		&client->sess.saberLevel,
-		&client->sess.selectedFP
+		&client->sess.selectedFP,
+
+		//By PowTecH - Account
+		&client->sess.password,
+		&client->sess.thisconnectuc,
+		&userlogged,
+		&displayName,
+		&client->sess.logintrys,
+		&client->sess.powerLevel,
+		&powerBit,
+
+		//By PowTecH - Stats
+		&client->sess.sDuelW,
+		&client->sess.sDuelL,
+		&client->sess.sK,
+		&client->sess.sD,
+		&client->sess.sTime,
+
+		//By PowTecH - RPG
+		&client->sess.money,
+
+		//By PowTecH - Flair
+		&emoteBit,
+
+		//By PowTecH - Ads
+		&client->sess.lastAd,
+
+		//By PowTecH - queue
+		&client->sess.queueNum,
+		&client->sess.queueTeam
 		);
 
 	// bk001205 - format issues

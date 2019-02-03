@@ -1848,6 +1848,37 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
 	self->client->ps.pm_type = PM_DEAD;
 
+	//By PowTecH - Merc: kill added to team scores
+	//if they are both in a queue and the same game
+	if (self->client->sess.queueNum != -1 && attacker->client->sess.queueNum != -1 &&
+		self->client->sess.queueNum == attacker->client->sess.queueNum) {
+
+		//if they were on the same team
+		if (self->client->sess.queueTeam == attacker->client->sess.queueTeam) {
+			//take away a kill
+			if (self->client->sess.queueTeam == TEAM_RED) {
+				level.redScore[self->client->sess.queueNum]--;
+			}
+			else {
+				level.blueScore[self->client->sess.queueNum]--;
+			}
+		}
+		//if they were not on the same team
+		else {
+			//add to their teams score
+			if (self->client->sess.queueTeam == TEAM_RED) {
+				level.blueScore[self->client->sess.queueNum]++;
+			}
+			else {
+				level.redScore[self->client->sess.queueNum]++;
+			}
+
+			if (level.finalScore == level.redScore[self->client->sess.queueNum] || level.finalScore == level.blueScore[self->client->sess.queueNum]) {
+				level.finishedGame = self->client->sess.queueNum;
+			}
+		}
+	}
+
 	if ( attacker ) {
 		killer = attacker->s.number;
 		if ( attacker->client ) {

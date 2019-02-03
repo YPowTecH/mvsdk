@@ -211,6 +211,13 @@ qboolean OnSameTeam( gentity_t *ent1, gentity_t *ent2 ) {
 		return qfalse;
 	}
 
+	//By PowTecH - Merc: friendly saber/fire when in a merc game
+	if (ent1->client->sess.queueTeam == ent2->client->sess.queueTeam) {
+		if (ent1->client->sess.queueTeam != 0 && ent2->client->sess.queueTeam != 0) {
+			return qtrue;
+		}
+	}
+
 	if ( g_gametype.integer < GT_TEAM ) {
 		return qfalse;
 	}

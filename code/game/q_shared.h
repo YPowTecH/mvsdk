@@ -263,7 +263,12 @@ typedef int		clipHandle_t;
 #define	MAX_OSPATH			256		// max length of a filesystem pathname
 #endif
 
-#define	MAX_NAME_LENGTH		32		// max length of a client name
+//By PowTecH - Name defines
+//Credit: Fau (sabermod)
+#define MAX_NETNAME			64		// max length of a client name + 1
+#define MAX_NAME_LEN		28		// max length of a printed client name
+#define	MAX_NAME_LENGTH		32		// arbitrary max string length used here and there
+#define MAX_TEAMNAME		32      // max length of a team name "spectators" but also g_blueTeam
 
 #define	MAX_SAY_TEXT	150
 

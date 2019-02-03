@@ -142,6 +142,10 @@ vmCvar_t	g_submodelWorkaround;
 
 vmCvar_t	g_MVSDK;
 
+//By PowTecH - Cvar's
+vmCvar_t  g_adMessage;
+vmCvar_t  g_adInterval;
+
 int gDuelist1 = -1;
 int gDuelist2 = -1;
 
@@ -313,12 +317,17 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_submodelWorkaround, "g_submodelWorkaround", "0", CVAR_ARCHIVE, 0, qtrue },
 
 	{ &g_MVSDK, "g_MVSDK", MVSDK_VERSION, CVAR_ROM | CVAR_SERVERINFO, 0, qfalse },
+
+	//By PowTecH - Cvar's
+	{ &g_adMessage, "g_adMessage", "Server Ad x)", CVAR_ARCHIVE, 0, qtrue },
+	{ &g_adInterval, "g_adInterval", "600000", CVAR_ARCHIVE, 0, qtrue },
 };
 
 // bk001129 - made static to avoid aliasing
 static int gameCvarTableSize = sizeof( gameCvarTable ) / sizeof( gameCvarTable[0] );
 
 
+char *Twimod_Splitstring(char *stringNew, char split);
 void G_InitGame					( int levelTime, int randomSeed, int restart );
 void G_RunFrame					( int levelTime );
 void G_ShutdownGame				( int restart );
@@ -687,6 +696,48 @@ void MV_UpdateSvFlags( void )
 	lastValue = intValue;
 }
 
+char *Twimod_Splitstring(char *stringNew, char split) {
+	static char *string = NULL;
+	static char *lastPos = NULL;
+	char *ptr;
+	char *retPtr;
+
+	// If we got a new string as parameter use it, otherwise reuse the previous one...
+	if (stringNew)
+	{
+		string = stringNew;
+		lastPos = string + strlen(string);
+	}
+
+	// If we don't have a string return an empty string
+	if (!string || !strlen(string)) return "";
+
+	//By PowTecH - I want to save my spot and come back to it later
+	if (split == '?') {
+		return string;
+	}
+	else {
+		// Find the split character
+		ptr = strchr(string, split);
+	}
+
+	// If we didn't find one return an empty string
+	if (!ptr) return string;//By PowTecH - why not just return the string?
+
+	// Zero the position of the split character
+	*ptr = 0;
+
+	// Remember the position behind the split character as new starting point
+	retPtr = string;
+	string = ptr + 1;
+
+	// Make sure we don't accidently hop into the next string in memory
+	if (string >= lastPos) string = NULL;
+
+	// Return the result
+	return retPtr;
+}
+
 /*
 ============
 G_InitGame
@@ -873,6 +924,28 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	{
 		G_LogPrintf("Duel Tournament Begun: kill limit %d, win limit: %d\n", g_fraglimit.integer, g_duel_fraglimit.integer );
 	}
+
+	//By PowTecH - inQueue init
+	for (i = 0; i < MAX_CLIENTS; i++) {
+		level.inQueue[i] = -1;
+	}
+	//By PowTecH - red and blue team init
+	for (i = 0; i < 16; i++) {
+		int j;
+		for (j = 0; j < MAX_CLIENTS; j++) {
+			level.redTeam[i][j] = -1;
+			level.blueTeam[i][j] = -1;
+		}
+	}
+	//By PowTecH - Scorelimit
+	level.finalScore = 5;
+
+	//By PowTecH - Finished Game Flag
+	level.finishedGame = -1;
+
+	//By PowTecH - queueTime
+	level.queueTime = 20000;
+	level.queuePop = level.time + level.queueTime;
 }
 
 

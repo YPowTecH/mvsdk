@@ -309,6 +309,36 @@ typedef struct {
 	qboolean	setForce;			// set to true once player is given the chance to set force powers
 	int			updateUITime;		// only update userinfo for FP/SL if < level.time
 	qboolean	teamLeader;			// true when this client is a team leader
+
+	//By PowTecH - Account
+	char		password[MAX_NETNAME];
+	int			powerLevel;
+	char		powerBit[MAX_TOKEN_CHARS];
+	char		userlogged[MAX_NETNAME];
+	char		displayName[MAX_NETNAME];
+	int			thisconnectuc;
+	int			logintrys;
+
+	//By PowTecH - Stats
+	int			sDuelW;
+	int			sDuelL;
+	int			sK;
+	int			sD;
+	int			sTime;
+
+	//By PowTecH - RPG
+	int			money;
+
+	//By PowTecH - Flair
+	char		emoteBit[MAX_TOKEN_CHARS];
+
+	//By PowTecH - Ads
+	int			lastAd;
+
+	//By PowTecH - queue
+	int			queueNum;
+	int			queueTeam;
+
 } clientSession_t;
 
 // JK2MV
@@ -318,7 +348,6 @@ typedef struct {
 } mvclientSession_t;
 
 //
-#define MAX_NETNAME			36
 #define	MAX_VOTE_COUNT		3
 
 // client data that stays across multiple respawns, but is cleared
@@ -339,6 +368,12 @@ typedef struct {
 	qboolean	teamInfo;			// send team overlay updates?
 } clientPersistant_t;
 
+//By PowTecH - Info: structure
+//Credit: fau (sabermod)
+// client data parsed from userinfo
+typedef struct {
+	char		netname[MAX_NETNAME];
+} clientUserinfo_t;
 
 // this structure is cleared on each ClientSpawn(),
 // except for 'client->pers' and 'client->sess'
@@ -349,6 +384,7 @@ struct gclient_s {
 	// the rest of the structure is private to game
 	clientPersistant_t	pers;
 	clientSession_t		sess;
+	clientUserinfo_t	info;
 
 	int			invulnerableTimer;
 
@@ -522,6 +558,19 @@ typedef struct {
 
 	// MVSDK
 	qboolean	bboxEncoding;
+
+	//By PowTecH - Queue
+	int			queueCount; //how many ppl are in queue
+	int			inQueue[MAX_CLIENTS]; //ppl in queue
+	int			queueTime;
+	int			queuePop; //time until queue pop
+	int			redTeam[16][MAX_CLIENTS];//16 possible games with max clients possible in each
+	int			blueTeam[16][MAX_CLIENTS];//16 possible games with max clients possible in each
+	int			finalScore;//score to play to
+	int			redScore[16];//16 possible game scores
+	int			blueScore[16];//16 possible game scores
+	int			finishedGame;//game that just hit the finalscore
+
 } level_locals_t;
 
 
@@ -829,6 +878,9 @@ int myrand( void );
 
 void MV_BBoxToTime2( gentity_t *ent );
 
+//By PowTecH - Twimod_splitstring
+char *Twimod_Splitstring(char *stringNew, char split);
+
 //
 // g_client.c
 //
@@ -845,6 +897,9 @@ void G_CheckClientTimeouts	( gentity_t *ent );
 void ClientThink			( int clientNum );
 void ClientEndFrame			( gentity_t *ent );
 void G_RunClient			( gentity_t *ent );
+
+//By PowTecH - queue
+void G_QueueRemove_Helper(gentity_t *ent);
 
 //
 // g_team.c
@@ -1077,6 +1132,10 @@ extern	vmCvar_t	g_connectinglimit;
 extern	vmCvar_t	g_mv_forcePowerDisableMode;
 
 extern	vmCvar_t	g_submodelWorkaround;
+
+//By PowTecH - Cvar's
+extern  vmCvar_t  g_adMessage;
+extern  vmCvar_t  g_adInterval;
 
 void	trap_Printf( const char *fmt );
 Q_NORETURN void	trap_Error( const char *fmt );

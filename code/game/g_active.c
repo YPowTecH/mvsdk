@@ -999,8 +999,13 @@ void ClientThink_real( gentity_t *ent ) {
 	pmove_t		pm;
 	int			oldEventSequence;
 	int			msec;
-	int			i;
-	usercmd_t	*ucmd;
+	int			i, j = 0, k = 0;
+	usercmd_t  *ucmd;
+
+	//By PowTecH - Merc: for spawning
+	vec3_t  spawn_origin, spawn_angles;
+	gentity_t  *spawnPoint;
+	gentity_t  *target;
 
 	client = ent->client;
 
@@ -1079,6 +1084,14 @@ void ClientThink_real( gentity_t *ent ) {
 	// clear the rewards if time
 	if ( level.time > client->rewardTime ) {
 		client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP );
+	}
+
+	//By PowTecH - Ads
+	if (client->sess.lastAd <= level.time) {
+		if (Q_stricmp(g_adMessage.string, "") != 0) {
+			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7Ad^5] %s\n\"", g_adMessage.string));
+			client->sess.lastAd = level.time + g_adInterval.integer;
+		}
 	}
 
 	if ( client->noclip ) {
@@ -1635,9 +1648,8 @@ void ClientThink_real( gentity_t *ent ) {
 						faceKicked->client->ps.velocity[2] = 200;
 					}
 				}
-
-				G_Sound( faceKicked, CHAN_AUTO, G_SoundIndex( va("sound/weapons/melee/punch%d", Q_irand(1, 4)) ) );
 			}
+			G_Sound(faceKicked, CHAN_AUTO, G_SoundIndex(va("sound/weapons/melee/punch%d", Q_irand(1, 4))));//By PowTecH - kicked: everyone should get the sound
 		}
 
 		client->ps.forceKickFlip = 0;
@@ -1666,10 +1678,203 @@ void ClientThink_real( gentity_t *ent ) {
 		return;
 	}
 
+	//By PowTecH - Merc: queue setup
+	if (level.queuePop <= level.time) {
+		if (level.queueCount >= 2) {
+			int max;
+			char mes[MAX_TOKEN_CHARS] = "";
+
+			char  model[MAX_QPATH];
+			char  userinfo[MAX_INFO_STRING];
+
+			trap_GetUserinfo(target->s.number, userinfo, sizeof(userinfo));
+
+			//if queue has an even amount of players
+			if (level.queueCount % 2 == 0) {
+				max = level.queueCount;
+			}
+			//if it has an odd number leave one guy out :(
+			else {
+				max = level.queueCount - 1;
+			}
+
+			//find an open slot to put this game
+			for (i = 0; i < 16; i++) {
+				if (level.redTeam[i][0] == -1) {
+					j = i;
+				}
+			}
+
+			//go through the queue and assign players to teams
+			for (i = 0; i < max; i++) {
+				target = &g_entities[level.inQueue[i]];
+				trap_UnlinkEntity(target);
+
+				if (i % 2 == 0) {
+					//assigned to team blue
+					level.redTeam[j][k] = level.inQueue[i];
+					//on team red
+					target->client->sess.queueTeam = TEAM_RED;
+					//new spawn location
+					spawnPoint = SelectCTFSpawnPoint(TEAM_RED, TEAM_BEGIN, spawn_origin, spawn_angles);
+					//getting ready to change their model to a team color one
+					Q_strncpyz(model, Info_ValueForKey(userinfo, "model"), sizeof(model));
+				}
+				else {
+					//assigned to team blue
+					level.blueTeam[j][k] = level.inQueue[i];
+					//on team blue
+					target->client->sess.queueTeam = TEAM_BLUE;
+					//new spawn location
+					spawnPoint = SelectCTFSpawnPoint(TEAM_BLUE, TEAM_BEGIN, spawn_origin, spawn_angles);
+					//getting ready to change their model to a team color one
+					Q_strncpyz(model, Info_ValueForKey(userinfo, "model"), sizeof(model));
+					k++;
+				}
+				//remember their queue number so we can tell that they are in a queue
+				target->client->sess.queueNum = j;
+
+				if (spawnPoint) {
+					// GalakingFix
+					if (g_mv_fixgalaking.integer && (!Q_stricmp(model, "galak_mech") || !Q_stricmpn(model, "galak_mech/", strlen("galak_mech/"))))
+					{
+						Q_strncpyz(model, "galak/default", sizeof(model));
+					}
+
+					if (g_mv_fixbrokenmodels.integer && (!Q_stricmpn(model, "kyle/fpls", strlen("kyle/fpls")) || !Q_stricmp(model, "morgan") || (!Q_stricmpn(model, "morgan/", strlen("morgan/")) && (Q_stricmp(model, "morgan/default_mp") && Q_stricmp(model, "morgan/red") && Q_stricmp(model, "morgan/blue")))))
+					{
+						Q_strncpyz(model, "kyle/default", sizeof(model));
+					}
+
+					/*
+					if (target->client->sess.queueTeam == TEAM_RED) {
+						ForceClientSkin(target->client, model, "red");
+					}
+					else {
+						ForceClientSkin(target->client, model, "blue");
+					}*/
+
+					TeleportPlayer(target, spawnPoint->s.origin, spawnPoint->s.angles);
+				}
+				else {
+					G_Printf("wtf?\n");
+				}
+			}
+
+			//remove all those players from queue
+			for (i = 0; i < max; i++) {
+				G_QueueRemove_Helper(&g_entities[level.inQueue[0]]);
+			}
+
+			//format a nice string to show that the game is starting with these teams
+			strcat(mes, "^3>^1Red ^7Team: ");
+			for (i = 0; i < max / 2; i++) {
+				strcat(mes, g_entities[level.redTeam[j][i]].client->pers.netname);
+				if (i + 1 != max / 2) {
+					strcat(mes, ", ");
+				}
+			}
+			strcat(mes, "\n^3>^7VS\n^3>^4Blue ^7Team: ");
+			for (i = 0; i < max / 2; i++) {
+				strcat(mes, g_entities[level.blueTeam[j][i]].client->pers.netname);
+				if (i + 1 != max / 2) {
+					strcat(mes, ", ");
+				}
+			}
+
+			trap_SendServerCommand(-1, va("print \"%s\n\"", mes));
+
+			//restart the time for the next queue
+			level.queuePop = level.time + level.queueTime;
+		}
+		else {
+			//not enough players so restart the timer
+			level.queuePop = level.time + level.queueTime;
+		}
+	}
+
+	if (level.finishedGame != -1) {
+		j = level.finishedGame;
+		for (i = 0; i < MAX_CLIENTS; i++) {
+			k = level.redTeam[j][i];
+			if (k == -1) {
+				break;
+			}
+
+			target = &g_entities[k];
+			//clear all the team information
+			target->client->sess.queueNum = -1;
+			target->client->sess.queueTeam = 0;
+
+			//new spawn location
+			spawnPoint = SelectSpawnPoint(target->client->ps.origin, spawn_origin, spawn_angles);
+
+			TeleportPlayer(target, spawnPoint->s.origin, spawnPoint->s.angles);
+
+			level.redTeam[j][i] = -1;
+		}
+
+		for (i = 0; i < MAX_CLIENTS; i++) {
+			k = level.blueTeam[j][i];
+			if (k == -1) {
+				break;
+			}
+
+			target = &g_entities[k];
+			//clear all the team information
+			target->client->sess.queueNum = -1;
+			target->client->sess.queueTeam = 0;
+
+			//new spawn location
+			spawnPoint = SelectSpawnPoint(target->client->ps.origin, spawn_origin, spawn_angles);
+
+			TeleportPlayer(target, spawnPoint->s.origin, spawnPoint->s.angles);
+
+			level.blueTeam[j][i] = -1;
+		}
+		level.blueScore[j] = 0;
+		level.redScore[j] = 0;
+		level.finishedGame = -1;
+	}
+
 	// perform once-a-second actions
 	ClientTimerActions( ent, msec );
 
 	G_UpdateClientBroadcasts ( ent );
+}
+
+//By PowTecH - Remove from queue when placed on team
+void G_QueueRemove_Helper(gentity_t *ent) {
+	int i, j;
+
+	//look for the player
+	for (i = 0; i < MAX_CLIENTS; i++) {
+		//found him
+		if (level.inQueue[i] == ent->s.number) {
+			level.inQueue[i] = -1;
+			level.queueCount--;
+			break;
+		}
+	}
+
+	//removed a user in the middle of the queue
+	if (i + 1 != MAX_CLIENTS && level.inQueue[i + 1] != -1) {
+		for (j = i; j < MAX_CLIENTS; j++) {
+			//if we are at the end of the array
+			if (j + 1 == MAX_CLIENTS) {
+				level.inQueue[j] = -1;
+			}
+
+			//move everyone up in the queue
+			level.inQueue[j] = level.inQueue[j + 1];
+
+			//we found the end of the queue
+			if (level.inQueue[j + 1] == -1) {
+				break;
+			}
+		}
+	}
+	return;
 }
 
 /*

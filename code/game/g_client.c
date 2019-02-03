@@ -923,11 +923,12 @@ static void ClientCleanName( const char *in, char *out, int outSize ) {
 				break;
 			}
 
+			//By PowTecH - Black names are allowed so fk u
 			// don't allow black in a name, period
-			if( ColorIndex(*in) == 0 ) {
-				in++;
-				continue;
-			}
+			/*if( ColorIndex(*in) == 0 ) {
+			  in++;
+			  continue;
+			}*/
 
 			// make sure room in dest for both chars
 			if( len > outSize - 2 ) {
@@ -1739,6 +1740,7 @@ void ClientSpawn(gentity_t *ent) {
 	int		i;
 	clientPersistant_t	saved;
 	clientSession_t		savedSess;
+	clientUserinfo_t	savedInfo;//By PowTecH - Info: save user info
 	int		persistant[MAX_PERSISTANT];
 	gentity_t	*spawnPoint;
 	int		flags;
@@ -1805,6 +1807,13 @@ void ClientSpawn(gentity_t *ent) {
 						client->pers.teamState.state, 
 						spawn_origin, spawn_angles);
 	}
+	//By PowTecH - Merc: respawn control
+	else if (client->sess.queueTeam == TEAM_RED || client->sess.queueTeam == TEAM_BLUE) {
+		spawnPoint = SelectCTFSpawnPoint(
+			client->sess.queueTeam,
+			TEAM_BEGIN,
+			spawn_origin, spawn_angles);
+	}
 	else {
 		do {
 			// the first spawn should be at a good looking spot
@@ -1844,6 +1853,8 @@ void ClientSpawn(gentity_t *ent) {
 	saved = client->pers;
 	savedSess = client->sess;
 	savedPing = client->ps.ping;
+	savedInfo = client->info;//By PowTecH - Info: save user info
+
 //	savedAreaBits = client->areabits;
 	accuracy_hits = client->accuracy_hits;
 	accuracy_shots = client->accuracy_shots;
@@ -1871,6 +1882,7 @@ void ClientSpawn(gentity_t *ent) {
 	client->ps.duelIndex = ENTITYNUM_NONE;
 
 	client->pers = saved;
+	client->info = savedInfo;//By PowTecH - Info: save user info 
 	client->sess = savedSess;
 	client->ps.ping = savedPing;
 //	client->areabits = savedAreaBits;

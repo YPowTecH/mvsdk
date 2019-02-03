@@ -1,4 +1,4 @@
-// Copyright (C) 1999-2000 Id Software, Inc.
+﻿// Copyright (C) 1999-2000 Id Software, Inc.
 //
 #include "g_local.h"
 
@@ -1120,19 +1120,23 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) 
 Cmd_Say_f
 ==================
 */
-static void Cmd_Say_f( gentity_t *ent) {
-	const char	*p;
-	int			mode;
+static void Cmd_Say_f( gentity_t *ent, int mode, qboolean arg0 ) {
+	char		*p;
 
-	if (trap_Argc() < 2) {
+	if ( trap_Argc () < 2 && !arg0 ) {
 		return;
 	}
 
-	p = ConcatArgs(1);
+	if (arg0)
+	{
+		p = ConcatArgs( 0 );
+	}
+	else
+	{
+		p = ConcatArgs( 1 );
+	}
 
-	mode = SAY_ALL;
-
-	G_Say(ent, NULL, mode, p);
+	G_Say( ent, NULL, mode, p );
 
 	//By PowTecH - Chat Commands
 	if (!strcmp(p, "!queue") || !strcmp(p, "!que") || !strcmp(p, "!q")) {
@@ -2458,21 +2462,6 @@ void DismembermentTest(gentity_t *self);
 void DismembermentByNum(gentity_t *self, int num);
 #endif
 
-//By PowTecH - consistance in writes to user files
-void help_write_f(gentity_t *ent, char *userfile) {
-	char userwrite[MAX_TOKEN_CHARS];
-	fileHandle_t	f;
-
-	trap_FS_FOpenFile(userfile, &f, FS_WRITE);
-	Com_sprintf(userwrite, sizeof(userwrite), "%s %s %i %i %i %i %i %i %i %s %s ",
-		ent->client->sess.password, ent->client->sess.displayName, ent->client->sess.money,
-		ent->client->sess.sDuelW, ent->client->sess.sDuelL, ent->client->sess.sK,
-		ent->client->sess.sD, ent->client->sess.sTime,
-		ent->client->sess.powerLevel, ent->client->sess.powerBit, ent->client->sess.emoteBit);
-	trap_FS_Write(userwrite, strlen(userwrite), f);
-	trap_FS_FCloseFile(f);
-}
-
 /*
 =================
 Register Account
@@ -2480,8 +2469,9 @@ from ouned's Twimod
 by PowTecH
 =================
 */
+/*
 void Cmd_Register_f(gentity_t *ent) {
-	char username[MAX_NETNAME], password1[80], password2[80];
+	char username[MAX_NETNAME], password1[80], password2[80], usernameStripped[80], tmp[80];
 	char userfile[MAX_QPATH];
 	char userwrite[MAX_QPATH];
 
@@ -2530,7 +2520,7 @@ void Cmd_Register_f(gentity_t *ent) {
 		// We are OK to creat the user
 		trap_FS_FCloseFile(f);
 		trap_FS_FOpenFile(userfile, &f, FS_APPEND);
-		Com_sprintf(userwrite, sizeof(userwrite), "%s %s 500 0 0 0 0 0 0 0 0 ", password1, ent->client->pers.netname);
+		Com_sprintf(userwrite, sizeof(userwrite), "%s %s 500 0 0 0 0 0 0 0 0 � ", password1, ent->client->info.netname);
 		trap_FS_Write(userwrite, strlen(userwrite), f);
 		trap_FS_FCloseFile(f);
 		trap_SendServerCommand(ent - g_entities, va("print \"^2[^7User '^2%s^7' with the password '^2%s^7' successfully created^2]^7\n\"", username, password1));
@@ -2542,18 +2532,8 @@ void Cmd_Register_f(gentity_t *ent) {
 		//strcpy(ent->client->sess.userpass, password1);
 
 		trap_SendServerCommand(ent - g_entities, va("print \"^2[^7You are now logged in as '^2%s^7'^2]^7\n\"", username));
-		/*if ( twimod_loginpuplicmsg.integer == 1 ) {
-		  trap_SendServerCommand( -1, va("print \"%s ^7is now logged in as %s^7.\n\"", ent->client->pers.netname, ent->client->sess.userlogged));
-		}
-		else if ( twimod_loginpuplicmsg.integer == 2 ) {
-		  trap_SendServerCommand( -1, va("cp \"%s ^7is now logged in as %s^7.\n\"", ent->client->pers.netname, ent->client->sess.userlogged));
-		  trap_SendServerCommand( clientNum, va("print \"You are now logged in as %s^7.\n\"", username));
-		}
-		else {
-		  trap_SendServerCommand( clientNum, va("print \"You are now logged in as %s^7.\n\"", username));
-		}*/
 	}
-}
+}*/
 
 /*
 =================
@@ -2562,17 +2542,17 @@ from ouned's Twimod
 by PowTecH
 =================
 */
+/*
 void Cmd_Login_f(gentity_t *ent) {
-	char username[MAX_NETNAME] = "";
+	char username[MAX_NETNAME];
 	char pass[MAX_NETNAME] = "";
 	char *passwordfile;
 
 	int len;
 
-	char buffer[MAX_TOKEN_CHARS] = "";
-	char userfile[MAX_TOKEN_CHARS] = "";
+	char buffer[1024] = "";
+	char userfile[MAX_QPATH];
 	fileHandle_t	f;
-
 	trap_Argv(1, username, sizeof(username));
 	trap_Argv(2, pass, sizeof(pass));
 
@@ -2604,7 +2584,7 @@ void Cmd_Login_f(gentity_t *ent) {
 	}
 
 	// Check that the username exist.
-	Com_sprintf(userfile, MAX_TOKEN_CHARS, "users/%s.cfg", username);
+	Com_sprintf(userfile, 1024 * 4, "users/%s.cfg", username);
 	trap_FS_FOpenFile(userfile, &f, FS_READ);
 
 	if (f) {
@@ -2618,7 +2598,7 @@ void Cmd_Login_f(gentity_t *ent) {
 		if (Q_stricmp(pass, passwordfile) == 0) {
 			strcpy(ent->client->sess.password, passwordfile);
 			strcpy(ent->client->sess.displayName, Twimod_Splitstring(NULL, ' '));
-			ent->client->sess.money = atoi(Twimod_Splitstring(NULL, ' '));
+			ent->client->sess.credits = atoi(Twimod_Splitstring(NULL, ' '));
 			ent->client->sess.sDuelW = atoi(Twimod_Splitstring(NULL, ' '));
 			ent->client->sess.sDuelL = atoi(Twimod_Splitstring(NULL, ' '));
 			ent->client->sess.sK = atoi(Twimod_Splitstring(NULL, ' '));
@@ -2642,7 +2622,7 @@ void Cmd_Login_f(gentity_t *ent) {
 		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7User '^1%s^7' does not exist^1]^7\n\"", username));
 	}
 }
-
+*/
 /*
 =================
 Logout Account
@@ -2650,6 +2630,7 @@ from ouned's Twimod
 by PowTecH
 =================
 */
+/*
 void Cmd_Logout_f(gentity_t *ent) {
 	char userfile[MAX_TOKEN_CHARS];
 	char userwrite[MAX_TOKEN_CHARS];
@@ -2659,7 +2640,7 @@ void Cmd_Logout_f(gentity_t *ent) {
 		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7You are not logged in^1]^7\n\""));
 	}
 	else {
-		Com_sprintf(userfile, MAX_TOKEN_CHARS, "users/%s.cfg", ent->client->sess.userlogged);
+		Com_sprintf(userfile, 1024 * 4, "users/%s.cfg", ent->client->sess.userlogged);
 		trap_FS_FOpenFile(userfile, &f, FS_READ);
 
 		if (f) {
@@ -2679,7 +2660,7 @@ void Cmd_Logout_f(gentity_t *ent) {
 		}
 	}
 }
-
+*/
 /*
 =================
 By PowTecH - Queue
@@ -2783,82 +2764,22 @@ void Cmd_ScoreQueue_f(gentity_t *ent) {
 	trap_SendServerCommand(ent - g_entities, va("print \"^5[^1Red^7:^1%i^7 - ^4%i^7:^4Blue^5]^7 - %s\n\"", level.redScore[i], level.blueScore[i]));
 }
 
-#define CMD_NOINTERMISSION	0x01
-#define CMD_CHEAT			0x02
-#define CMD_ALIVE			0x04
-#define CMD_REFEREE			0x08	// update these in cg_players.c::CG_RefereeMode
-
-typedef struct {
-	const char	*name;				// must be lower-case for comparing
-	void		(*function)(gentity_t *);
-	int			flags;				// allow during intermission
-} clientCommand_t;
-
-static const clientCommand_t commands[] = {
-	{ "say", Cmd_Say_f, 0 },
-	//{ "say_team", Cmd_SayTeam_f, 0 },
-	{ "tell", Cmd_Tell_f, 0 },
-	{ "score", Cmd_Score_f, 0 },
-	{ "kill", Cmd_Kill_f, CMD_ALIVE | CMD_NOINTERMISSION },
-	{ "follow", Cmd_Follow_f, CMD_NOINTERMISSION },
-	//{ "follownext", Cmd_FollowNext_f, CMD_NOINTERMISSION },
-	//{ "followprev", Cmd_FollowPrev_f, CMD_NOINTERMISSION },
-	//{ "ready", Cmd_Ready_f, CMD_NOINTERMISSION },
-	{ "team", Cmd_Team_f, CMD_NOINTERMISSION },
-	{ "forcechanged", Cmd_ForceChanged_f, 0 },
-	{ "where", Cmd_Where_f, 0 },
-	{ "callvote", Cmd_CallVote_f, CMD_NOINTERMISSION },
-	{ "vote", Cmd_Vote_f, CMD_NOINTERMISSION },
-	{ "callteamvote", Cmd_CallTeamVote_f, CMD_NOINTERMISSION },
-	{ "teamvote", Cmd_TeamVote_f, CMD_NOINTERMISSION },
-	//{ "ragequit", Cmd_RageQuit_f, 0 },
-	{ "gc", Cmd_GameCommand_f, CMD_NOINTERMISSION },
-	//{ "timeout", Cmd_Timeout_f, CMD_ALIVE | CMD_NOINTERMISSION },
-	//{ "timein", Cmd_Timein_f, CMD_ALIVE | CMD_NOINTERMISSION },
-	//{ "referee", Cmd_Referee_f, 0 },
-	{ "give", Cmd_Give_f, CMD_ALIVE | CMD_NOINTERMISSION },
-	{ "god", Cmd_God_f, CMD_ALIVE | CMD_NOINTERMISSION },
-	{ "notarget", Cmd_Notarget_f, CMD_CHEAT | CMD_ALIVE | CMD_NOINTERMISSION },
-	{ "noclip", Cmd_Noclip_f, CMD_ALIVE | CMD_NOINTERMISSION },
-	{ "setviewpos", Cmd_SetViewpos_f, CMD_CHEAT | CMD_NOINTERMISSION },
-	{ "teamtask", Cmd_TeamTask_f, CMD_CHEAT | CMD_NOINTERMISSION },
-	{ "levelshot", Cmd_LevelShot_f, CMD_CHEAT | CMD_ALIVE | CMD_NOINTERMISSION },
-	//{ "thedestroyer", Cmd_TheDestroyer_f, CMD_CHEAT | CMD_ALIVE | CMD_NOINTERMISSION },
-	//{ "addbot", Cmd_AddBot_f, 0 },
-	//By PowTecH - am commands
-	{ "amregister", Cmd_Register_f, CMD_NOINTERMISSION },
-	{ "amlogin", Cmd_Login_f, CMD_NOINTERMISSION },
-	{ "amlogout", Cmd_Logout_f, CMD_NOINTERMISSION },
-	/*#ifdef _DEBUG
-		{ "headexplodey", Cmd_HeadExplodey_f, CMD_CHEAT },
-		{ "g2animent", G_CreateExampleAnimEnt, CMD_CHEAT },
-		{ "loveandpeace", Cmd_LoveAndPeace_f, CMD_CHEAT },
-		{ "debugplum", Cmd_DebugPlum_f, CMD_CHEAT },
-		{ "debugsetsabermove", Cmd_DebugSetSaberMove_f, CMD_CHEAT },
-		{ "debugsetbodyanim", Cmd_DebugSetBodyAnim_f, CMD_CHEAT },
-		{ "debugdismemberment", Cmd_DebugDismemberment_f, CMD_CHEAT },
-		{ "debugknockmedown", Cmd_DebugKnockMeDown_f, CMD_CHEAT },
-	#endif*/
-};
-
 /*
 =================
 ClientCommand
 =================
 */
 void ClientCommand( int clientNum ) {
-	const clientCommand_t	*command = NULL;
-	gentity_t				*ent;
-	char					cmd[MAX_TOKEN_CHARS];
-	unsigned				i;
+	gentity_t *ent;
+	char	cmd[MAX_TOKEN_CHARS];
 
 	ent = g_entities + clientNum;
 	if ( !ent->client || ent->client->pers.connected < CON_CONNECTED ) {
 		return;		// not fully in game yet
 	}
 
-	trap_Argv(0, cmd, sizeof(cmd));
-	Q_strlwr(cmd);
+
+	trap_Argv( 0, cmd, sizeof( cmd ) );
 	
 	// Filter "\n" and "\r"
 	if( strchr(ConcatArgs(0), '\n') != NULL || strchr(ConcatArgs(0), '\r') != NULL )
@@ -2875,42 +2796,6 @@ void ClientCommand( int clientNum ) {
 	}
 	//end rww
 
-	for (i = 0; i < ARRAY_LEN(commands); i++) {
-		if (!strcmp(cmd, commands[i].name)) {
-			command = &commands[i];
-			break;
-		}
-	}
-
-	if (command == NULL) {
-		trap_SendServerCommand(clientNum, va("print \"unknown cmd %s\n\"", cmd));
-		return;
-	}
-
-	if (command->flags & CMD_CHEAT) {
-		if (!g_cheats.integer) {
-			trap_SendServerCommand(ent - g_entities, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "NOCHEATS")));
-			return;
-		}
-	}
-
-	if (command->flags & CMD_NOINTERMISSION) {
-		if (level.intermissiontime || level.intermissionQueued) {
-			trap_SendServerCommand(clientNum, va("print \"You cannot perform this task (%s) during the intermission.\n\"", cmd));
-			return;
-		}
-	}
-
-	if (command->flags & CMD_ALIVE) {
-		if (ent->health <= 0 || ent->client->sess.spectatorState != SPECTATOR_NOT) {
-			trap_SendServerCommand(ent - g_entities, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "MUSTBEALIVE")));
-			return;
-		}
-	}
-
-	command->function(ent);
-
-	/*
 	if (Q_stricmp (cmd, "say") == 0) {
 		Cmd_Say_f (ent, SAY_ALL, qfalse);
 		return;
@@ -2922,7 +2807,7 @@ void ClientCommand( int clientNum ) {
 	if (Q_stricmp (cmd, "tell") == 0) {
 		Cmd_Tell_f ( ent );
 		return;
-	}*/
+	}
 	/*
 	if (Q_stricmp (cmd, "vsay") == 0) {
 		Cmd_Voice_f (ent, SAY_ALL, qfalse, qfalse);
@@ -2953,7 +2838,6 @@ void ClientCommand( int clientNum ) {
 		return;
 	}
 	*/
-	/*
 	if (Q_stricmp (cmd, "score") == 0) {
 		Cmd_Score_f (ent);
 		return;
@@ -3057,54 +2941,48 @@ void ClientCommand( int clientNum ) {
 		return;
 	}
 
-	if (Q_stricmp(cmd, "give") == 0)
+	if (Q_stricmp (cmd, "give") == 0)
 	{
-		Cmd_Give_f(ent);
+		Cmd_Give_f (ent);
 	}
-	else if (Q_stricmp(cmd, "god") == 0)
-		Cmd_God_f(ent);
-	else if (Q_stricmp(cmd, "notarget") == 0)
-		Cmd_Notarget_f(ent);
-	else if (Q_stricmp(cmd, "noclip") == 0)
-		Cmd_Noclip_f(ent);
-	else if (Q_stricmp(cmd, "kill") == 0)
-		Cmd_Kill_f(ent);
-	else if (Q_stricmp(cmd, "teamtask") == 0)
-		Cmd_TeamTask_f(ent);
-	else if (Q_stricmp(cmd, "levelshot") == 0)
-		Cmd_LevelShot_f(ent);
-	else if (Q_stricmp(cmd, "follow") == 0)
-		Cmd_Follow_f(ent);
-	else if (Q_stricmp(cmd, "follownext") == 0)
-		Cmd_FollowCycle_f(ent, 1);
-	else if (Q_stricmp(cmd, "followprev") == 0)
-		Cmd_FollowCycle_f(ent, -1);
-	else if (Q_stricmp(cmd, "team") == 0)
-		Cmd_Team_f(ent);
-	else if (Q_stricmp(cmd, "forcechanged") == 0)
-		Cmd_ForceChanged_f(ent);
-	else if (Q_stricmp(cmd, "where") == 0)
-		Cmd_Where_f(ent);
-	else if (Q_stricmp(cmd, "callvote") == 0)
-		Cmd_CallVote_f(ent);
-	else if (Q_stricmp(cmd, "vote") == 0)
-		Cmd_Vote_f(ent);
-	else if (Q_stricmp(cmd, "callteamvote") == 0)
-		Cmd_CallTeamVote_f(ent);
-	else if (Q_stricmp(cmd, "teamvote") == 0)
-		Cmd_TeamVote_f(ent);
-	else if (Q_stricmp(cmd, "gc") == 0)
-		Cmd_GameCommand_f(ent);
-	else if (Q_stricmp(cmd, "setviewpos") == 0)
-		Cmd_SetViewpos_f(ent);
-	else if (Q_stricmp(cmd, "stats") == 0)
-		Cmd_Stats_f(ent);
-	else if (Q_stricmp(cmd, "register") == 0)
-		Cmd_Register_f(ent);
-	else if (Q_stricmp(cmd, "login") == 0)
-		Cmd_Login_f(ent);
-	else if (Q_stricmp(cmd, "logout") == 0)
-		Cmd_Logout_f(ent);*/
+	else if (Q_stricmp (cmd, "god") == 0)
+		Cmd_God_f (ent);
+	else if (Q_stricmp (cmd, "notarget") == 0)
+		Cmd_Notarget_f (ent);
+	else if (Q_stricmp (cmd, "noclip") == 0)
+		Cmd_Noclip_f (ent);
+	else if (Q_stricmp (cmd, "kill") == 0)
+		Cmd_Kill_f (ent);
+	else if (Q_stricmp (cmd, "teamtask") == 0)
+		Cmd_TeamTask_f (ent);
+	else if (Q_stricmp (cmd, "levelshot") == 0)
+		Cmd_LevelShot_f (ent);
+	else if (Q_stricmp (cmd, "follow") == 0)
+		Cmd_Follow_f (ent);
+	else if (Q_stricmp (cmd, "follownext") == 0)
+		Cmd_FollowCycle_f (ent, 1);
+	else if (Q_stricmp (cmd, "followprev") == 0)
+		Cmd_FollowCycle_f (ent, -1);
+	else if (Q_stricmp (cmd, "team") == 0)
+		Cmd_Team_f (ent);
+	else if (Q_stricmp (cmd, "forcechanged") == 0)
+		Cmd_ForceChanged_f (ent);
+	else if (Q_stricmp (cmd, "where") == 0)
+		Cmd_Where_f (ent);
+	else if (Q_stricmp (cmd, "callvote") == 0)
+		Cmd_CallVote_f (ent);
+	else if (Q_stricmp (cmd, "vote") == 0)
+		Cmd_Vote_f (ent);
+	else if (Q_stricmp (cmd, "callteamvote") == 0)
+		Cmd_CallTeamVote_f (ent);
+	else if (Q_stricmp (cmd, "teamvote") == 0)
+		Cmd_TeamVote_f (ent);
+	else if (Q_stricmp (cmd, "gc") == 0)
+		Cmd_GameCommand_f( ent );
+	else if (Q_stricmp (cmd, "setviewpos") == 0)
+		Cmd_SetViewpos_f( ent );
+	else if (Q_stricmp (cmd, "stats") == 0)
+		Cmd_Stats_f( ent );
 	/*
 	else if (Q_stricmp(cmd, "#mm") == 0 && CheatsOk( ent ))
 	{
@@ -3113,7 +2991,6 @@ void ClientCommand( int clientNum ) {
 	*/
 	//I broke the ATST when I restructured it to use a single global anim set for all client animation.
 	//You can fix it, but you'll have to implement unique animations (per character) again.
-/*
 #ifdef _DEBUG //sigh..
 	else if (Q_stricmp(cmd, "headexplodey") == 0 && CheatsOk( ent ))
 	{
@@ -3270,5 +3147,5 @@ void ClientCommand( int clientNum ) {
 		{
 			trap_SendServerCommand( clientNum, va("print \"unknown cmd %s\n\"", cmd ) );
 		}
-	}*/
+	}
 }
