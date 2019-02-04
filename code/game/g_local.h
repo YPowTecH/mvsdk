@@ -328,6 +328,7 @@ typedef struct {
 
 	//By PowTecH - RPG
 	int			money;
+	int			houseID;
 
 	//By PowTecH - Flair
 	char		emoteBit[MAX_TOKEN_CHARS];

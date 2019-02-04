@@ -2716,7 +2716,7 @@ void Cmd_HouseList_f(gentity_t *ent) {
 		if (Q_stricmp(ent_list[i]->classname, "pow_house") == 0) {
 			hit++;
 			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%i^5][^7%s ^7- ^2$^7%i^5]^7\n\"",
-				ent_list[i]->spawnflags, ent_list[i]->message, ent_list[i]->boltpoint2));
+				ent_list[i]->spawnflags, ent_list[i]->message, ent_list[i]->boltpoint1));
 		}
 	}
 
@@ -2730,32 +2730,56 @@ By PowTecH - RPG: House Buy
 =================
 */
 void Cmd_HouseBuy_f(gentity_t *ent) {
-	int i = 8192, count, hit;
+	int i = 8192, count;
 	gentity_t *ent_list[MAX_GENTITIES];
 	char houseID[7] = "";
+
+	if (ent->client->sess.houseID != 0) {
+		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Have to sell your house first - ^1/^7pjsellhouse %i^1]^7\n\"", ent->client->sess.houseID));
+		return;
+	}
 
 	trap_Argv(1, houseID, sizeof(houseID));
 
 	count = G_RadiusList(ent->r.currentOrigin, i, ent, qfalse, ent_list);
 	for (i = 0; i < count; i++) {
 		if (Q_stricmp(ent_list[i]->classname, "pow_house") == 0 && ent_list[i]->spawnflags == atoi(houseID)) {
-			if (ent->client->sess.money >= ent_list[i]->boltpoint2) {
-				ent->client->sess.money -= ent_list[i]->boltpoint2;
-				ent->client->sess.powerLevel = ent_list[i]->spawnflags;
+			if (ent->client->sess.money >= ent_list[i]->boltpoint1) {
+				ent->client->sess.money -= ent_list[i]->boltpoint1;
+				ent->client->sess.houseID = ent_list[i]->spawnflags;
 				trap_SendServerCommand(ent - g_entities, va("print \"^2[^7'%s^7' Purchased^2]^7\n\"", ent_list[i]->message));
 			}
 			else {
-				trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Not enough money ^1- ^7%i^1/^7%i^1]^7\n\"",ent->client->sess.money, ent_list[i]->boltpoint2));
+				trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Not enough money ^1- ^7%i^1/^7%i^1]^7\n\"",ent->client->sess.money, ent_list[i]->boltpoint1));
 			}
 			return;
 		}
 	}
 
-	if (hit <= 0) {
-		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Couldn't find house number '^1%i^7'^1]^7\n\"", houseID));
-	}
+	trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Couldn't find house number '^1%s^7'^1]^7\n\"", houseID));
 }
 
+void Cmd_HouseSell_f(gentity_t *ent) {
+	int i = 8192, count;
+	gentity_t *ent_list[MAX_GENTITIES];
+
+	if (ent->client->sess.houseID <= 0) {
+		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Don't have a house to sell^1]^7\n\""));
+		return;
+	}
+
+	count = G_RadiusList(ent->r.currentOrigin, i, ent, qfalse, ent_list);
+	for (i = 0; i < count; i++) {
+		if (Q_stricmp(ent_list[i]->classname, "pow_house") == 0 && ent_list[i]->spawnflags == ent->client->sess.houseID) {
+			ent->client->sess.money += ent_list[i]->boltpoint2;
+			ent->client->sess.houseID = 0;
+			trap_SendServerCommand(ent - g_entities, va("print \"^2[^7'%s^7' Sold for ^2$^7%i^2]^7\n\"", ent_list[i]->message, ent_list[i]->boltpoint2));
+			return;
+		}
+	}
+
+	trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Couldn't find your house^1]^7\n\""));
+}
 /*
 =================
 By PowTecH - Queue
@@ -2907,6 +2931,7 @@ static const clientCommand_t commands[] = {
 	{ "amlogout", Cmd_Logout_f, CMD_NOINTERMISSION },
 	{ "pjhouses", Cmd_HouseList_f, CMD_NOINTERMISSION },
 	{ "pjbuyhouse", Cmd_HouseBuy_f, CMD_NOINTERMISSION },
+	{ "pjsellhouse", Cmd_HouseSell_f, CMD_NOINTERMISSION },
 	/*#ifdef _DEBUG
 		{ "headexplodey", Cmd_HeadExplodey_f, CMD_CHEAT },
 		{ "g2animent", G_CreateExampleAnimEnt, CMD_CHEAT },

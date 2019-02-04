@@ -19,7 +19,7 @@ void Use_Pow_House(gentity_t *self, gentity_t *other, gentity_t *activator) {
 		return;
 	}
 
-	if (activator->client->sess.powerLevel != self->spawnflags) {
+	if (activator->client->sess.houseID != self->spawnflags) {
 		//tell them they dont own it?
 		//and if it is open to buy?
 		//-how much and how to
@@ -33,11 +33,15 @@ void Use_Pow_House(gentity_t *self, gentity_t *other, gentity_t *activator) {
 void SP_Pow_House(gentity_t *ent) {
 	//ent->think = Think_Pow_Plant;
 	//ent->nextthink = level.time + 1000;
-	int cost;
+	int buy;
+	int sell;
 	char *message;
 
-	G_SpawnInt("boltpoint2", "2", &cost);
-	ent->boltpoint2 = cost;
+	G_SpawnInt("boltpoint1", "1", &buy);
+	ent->boltpoint1 = buy;
+
+	G_SpawnInt("boltpoint2", "2", &sell);
+	ent->boltpoint2 = sell;
 
 	G_SpawnString("message", "House", &message);
 	ent->roffname = message;
