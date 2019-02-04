@@ -792,7 +792,7 @@ int G_PlayerBecomeATST(gentity_t *ent);
 void G_CreateExampleAnimEnt(gentity_t *ent);
 
 //By PowTecH - RPG: House target
-void Pow_House(gentity_t *ent);
+void SP_Pow_House(gentity_t *ent);
 
 //By PowTecH - Farming: resource spawn
 void SP_Pow_Resource(gentity_t *ent);

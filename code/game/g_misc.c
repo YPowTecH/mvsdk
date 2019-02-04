@@ -13,8 +13,6 @@
 void HolocronThink(gentity_t *ent);
 extern vmCvar_t g_MaxHolocronCarry;
 
-//void Pow_Resource(gentity_t *ent);
-
 //By PowTecH - RPG: House target
 void Use_Pow_House(gentity_t *self, gentity_t *other, gentity_t *activator) {
 	if (!activator || !activator->client) {
@@ -32,11 +30,20 @@ void Use_Pow_House(gentity_t *self, gentity_t *other, gentity_t *activator) {
 	G_UseTargets(self, activator);
 }
 
-void Pow_House(gentity_t *ent) {
+void SP_Pow_House(gentity_t *ent) {
 	//ent->think = Think_Pow_Plant;
 	//ent->nextthink = level.time + 1000;
+	int cost;
+	char *message;
+
+	G_SpawnInt("boltpoint2", "2", &cost);
+	ent->boltpoint2 = cost;
+
+	G_SpawnString("message", "House", &message);
+	ent->roffname = message;
 
 	ent->use = Use_Pow_House;
+	trap_LinkEntity(ent);
 }
 //
 //By PowTecH - Farming: resource spawn

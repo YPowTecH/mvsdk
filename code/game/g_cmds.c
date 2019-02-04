@@ -2704,6 +2704,29 @@ void Cmd_Logout_f(gentity_t *ent) {
 
 /*
 =================
+By PowTecH - RPG: House list
+=================
+*/
+void Cmd_HouseList_f(gentity_t *ent) {
+	int i = 8192, count, hit;
+	gentity_t *ent_list[MAX_GENTITIES];
+
+	count = G_RadiusList(ent->r.currentOrigin, i, ent, qfalse, ent_list);
+	for (i = 0; i < count; i++) {
+		if (Q_stricmp(ent_list[i]->classname, "pow_house") == 0) {
+			hit++;
+			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%s ^7- ^2$^7%i^5]^7\n\"",
+				ent_list[i]->message, ent_list[i]->boltpoint2));
+		}
+	}
+
+	if (hit <= 0) {
+		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Couldn't find any houses near by^1]^7\n\""));
+	}
+}
+
+/*
+=================
 By PowTecH - Queue
 =================
 */
@@ -2847,10 +2870,11 @@ static const clientCommand_t commands[] = {
 	{ "levelshot", Cmd_LevelShot_f, CMD_CHEAT | CMD_ALIVE | CMD_NOINTERMISSION },
 	//{ "thedestroyer", Cmd_TheDestroyer_f, CMD_CHEAT | CMD_ALIVE | CMD_NOINTERMISSION },
 	{ "addbot", Cmd_AddBot_f, 0 },
-	//By PowTecH - am commands
+	//By PowTecH - Account: login commands
 	{ "amregister", Cmd_Register_f, CMD_NOINTERMISSION },
 	{ "amlogin", Cmd_Login_f, CMD_NOINTERMISSION },
 	{ "amlogout", Cmd_Logout_f, CMD_NOINTERMISSION },
+	{ "pjhouses", Cmd_HouseList_f, CMD_NOINTERMISSION },
 	/*#ifdef _DEBUG
 		{ "headexplodey", Cmd_HeadExplodey_f, CMD_CHEAT },
 		{ "g2animent", G_CreateExampleAnimEnt, CMD_CHEAT },
