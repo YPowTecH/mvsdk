@@ -197,6 +197,11 @@ void SP_item_botroam( gentity_t *ent )
 
 void SP_emplaced_gun( gentity_t *ent );
 
+//By PowTecH - RPG: House target
+void Pow_House(gentity_t *ent);
+//By PowTecH - Farming: resource spawn
+void SP_Pow_Resource(gentity_t *ent);
+
 spawn_t	spawns[] = {
 	// info entities don't do anything at all, but provide positional
 	// information for things controlled by other processes
@@ -287,6 +292,11 @@ spawn_t	spawns[] = {
 	{"item_botroam", SP_item_botroam},
 
 	{"emplaced_gun", SP_emplaced_gun},
+
+	//By PowTecH - RPG: House target
+	{"pow_house", Pow_House},
+	//By PowTecH - Farming: resource spawn
+	{"pow_resource", SP_Pow_Resource},
 
 	{0, 0}
 };

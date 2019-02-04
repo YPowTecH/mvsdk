@@ -373,6 +373,7 @@ typedef struct {
 // client data parsed from userinfo
 typedef struct {
 	char		netname[MAX_NETNAME];
+
 } clientUserinfo_t;
 
 // this structure is cleared on each ClientSpawn(),
@@ -773,6 +774,9 @@ void WP_FireBlasterMissile( gentity_t *ent, vec3_t start, vec3_t dir, qboolean a
 void G_RunMover( gentity_t *ent );
 void Touch_DoorTrigger( gentity_t *ent, gentity_t *other, trace_t *trace );
 
+//By PowTecH - Farming: resource spawn
+void Trigger_Pow_Resource(gentity_t *ent);
+
 //
 // g_trigger.c
 //
@@ -787,6 +791,11 @@ void ATST_ManageDamageBoxes(gentity_t *ent);
 int G_PlayerBecomeATST(gentity_t *ent);
 void G_CreateExampleAnimEnt(gentity_t *ent);
 
+//By PowTecH - RPG: House target
+void Pow_House(gentity_t *ent);
+
+//By PowTecH - Farming: resource spawn
+void SP_Pow_Resource(gentity_t *ent);
 
 //
 // g_weapon.c

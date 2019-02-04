@@ -821,6 +821,78 @@ void Touch_DoorTrigger( gentity_t *ent, gentity_t *other, trace_t *trace ) {
 	}
 }
 
+//By PowTecH - Farming: resource spawn
+void Pow_Resource(gentity_t *self, gentity_t *activator) {
+	gentity_t *newEnt;
+
+	if (!activator->client)
+	{
+		return;
+	}
+
+	if (!(activator->client->pers.cmd.buttons & BUTTON_USE))
+	{
+		return;
+	}
+
+	trap_UnlinkEntity(self);
+
+	newEnt = G_Spawn();
+
+	newEnt->model = self->parent->model;
+	newEnt->wait = self->parent->wait;
+	newEnt->s.origin[0] = self->parent->s.origin[0];
+	newEnt->s.origin[1] = self->parent->s.origin[1];
+	newEnt->s.origin[2] = self->parent->s.origin[2];
+	newEnt->s.angles[0] = self->parent->s.angles[0];
+	newEnt->s.angles[1] = self->parent->s.angles[1];
+	newEnt->s.angles[2] = self->parent->s.angles[2];
+
+	G_FreeEntity(self->parent);
+	G_FreeEntity(self);
+
+	newEnt->think = SP_Pow_Resource;
+	newEnt->nextthink = level.time + newEnt->wait * 1000;
+}
+
+void Use_Pow_Resource(gentity_t *self, gentity_t *other, gentity_t *activator) {
+	Pow_Resource(self, activator);
+}
+
+void Touch_Pow_Resource(gentity_t *self, gentity_t *other, trace_t *trace) {
+	if (!other->client) {
+		return;
+	}
+	Pow_Resource(self, other);
+}
+
+void Trigger_Pow_Resource (gentity_t *ent) {
+	gentity_t		*other;
+	vec3_t		mins, maxs;
+	// find the bounds of everything on the team
+	VectorCopy(ent->r.absmin, mins);
+	VectorCopy(ent->r.absmax, maxs);
+
+	//can pick up the bomb from any angle
+	maxs[0] += 16;
+	maxs[1] += 16;
+	maxs[2] += 16;
+
+	mins[0] -= 16;
+	mins[1] -= 16;
+	mins[2] -= 16;
+
+	other = G_Spawn();
+	VectorCopy(mins, other->r.mins);
+	VectorCopy(maxs, other->r.maxs);
+	other->parent = ent;
+	other->r.contents = CONTENTS_TRIGGER;
+	other->touch = Touch_Pow_Resource;
+	other->use = Use_Pow_Resource;
+
+	trap_LinkEntity(other);
+}
+//
 
 /*
 ======================

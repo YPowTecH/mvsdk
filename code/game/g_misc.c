@@ -13,6 +13,71 @@
 void HolocronThink(gentity_t *ent);
 extern vmCvar_t g_MaxHolocronCarry;
 
+//void Pow_Resource(gentity_t *ent);
+
+//By PowTecH - RPG: House target
+void Use_Pow_House(gentity_t *self, gentity_t *other, gentity_t *activator) {
+	if (!activator || !activator->client) {
+		return;
+	}
+
+	if (activator->client->sess.powerLevel != self->spawnflags) {
+		//tell them they dont own it?
+		//and if it is open to buy?
+		//-how much and how to
+		trap_SendServerCommand(activator - g_entities, va("cp \"^1You dont own this house\""));
+		return;
+	}
+
+	G_UseTargets(self, activator);
+}
+
+void Pow_House(gentity_t *ent) {
+	//ent->think = Think_Pow_Plant;
+	//ent->nextthink = level.time + 1000;
+
+	ent->use = Use_Pow_House;
+}
+//
+//By PowTecH - Farming: resource spawn
+void SP_Pow_Resource(gentity_t *ent) {
+	gentity_t *other;
+	int mins[3] = { -2, -2, -2 };
+	int maxs[3] = { 2, 2, 2 };
+
+	vec3_t dest;
+	trace_t tr;
+
+	ent->s.modelindex = G_ModelIndex(ent->model);
+
+	VectorSet(ent->r.mins, mins[0], mins[1], mins[2]);
+	VectorSet(ent->r.maxs, maxs[0], maxs[1], maxs[2]);
+
+	VectorSet(dest, ent->s.origin[0], ent->s.origin[1], ent->s.origin[2] - 4096);
+	trap_Trace(&tr, ent->s.origin, ent->r.mins, ent->r.maxs, dest, ent->s.number, MASK_SOLID);
+	if (tr.startsolid)
+	{
+		G_Printf("SP_misc_shield_floor_unit: misc_shield_floor_unit startsolid at %s\n", vtos(ent->s.origin));
+		G_FreeEntity(ent);
+		return;
+	}
+
+	/*
+	ent->s.eFlags = 0;
+	ent->r.svFlags |= SVF_PLAYER_USABLE;
+	ent->r.contents = CONTENTS_SOLID;
+	ent->clipmask = MASK_SOLID;*/
+
+	G_SetOrigin(ent, ent->s.origin);
+	G_SetAngles(ent, ent->s.angles);
+
+	ent->nextthink = level.time + FRAMETIME;
+	ent->think = Trigger_Pow_Resource;
+
+	trap_LinkEntity(ent);
+}
+//
+
 /*QUAKED func_group (0 0 0) ?
 Used to group brushes together just for editor convenience.  They are turned into normal brushes by the utilities.
 */
