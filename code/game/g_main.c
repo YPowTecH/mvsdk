@@ -6,6 +6,7 @@
 #include "mvsdk_setup.h"
 
 level_locals_t	level;
+qboolean		g_mvapi;
 
 typedef struct {
 	vmCvar_t	*vmCvar;
@@ -126,6 +127,8 @@ vmCvar_t	g_saberDmgDelay_Wound;
 vmCvar_t	g_saberDebugPrint;
 
 vmCvar_t	g_austrian;
+
+vmCvar_t    g_damagePlums;
 
 // Fixes and multiversion cvars
 vmCvar_t	g_mv_fixgalaking;
@@ -291,6 +294,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_saberDebugPrint, "g_saberDebugPrint", "0", CVAR_CHEAT, 0, qfalse  },
 
 	{ &g_austrian, "g_austrian", "0", CVAR_ARCHIVE, 0, qfalse  },
+
+	{ &g_damagePlums, "g_damagePlums", "1", CVAR_ARCHIVE , 0, qtrue },
 
 	{ &g_mv_fixgalaking, "mv_fixgalaking", "1", CVAR_ARCHIVE, 0, qfalse },
 	{ &g_mv_fixbrokenmodels, "mv_fixbrokenmodels", "1", CVAR_ARCHIVE, 0, qfalse },
@@ -468,6 +473,7 @@ int MVAPI_Init(int apilevel)
 		G_Printf("Game: You need at least JK2MV " MV_MIN_VERSION " to enable all API features.\n");
 	}
 
+	g_mvapi = qtrue;
 	mvapi = apilevel;
 	if ( mvapi > MV_APILEVEL ) mvapi = MV_APILEVEL;
 

@@ -1022,6 +1022,7 @@ int BotAIStartFrame( int time );
 
 
 extern	level_locals_t	level;
+extern	qboolean		g_mvapi;
 extern	gentity_t		g_entities[MAX_GENTITIES];
 
 #define	FOFS(x) ((size_t)&(((gentity_t *)0)->x))
@@ -1122,6 +1123,7 @@ extern	vmCvar_t	g_saberDebugPrint;
 
 extern	vmCvar_t	g_austrian;
 
+extern	vmCvar_t	g_damagePlums;
 extern	vmCvar_t	g_mv_fixgalaking;
 extern	vmCvar_t	g_mv_fixbrokenmodels;
 extern	vmCvar_t	g_mv_blockchargejump;

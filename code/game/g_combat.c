@@ -525,6 +525,9 @@ void ScorePlum( gentity_t *ent, vec3_t origin, int score ) {
 	// only send this temp entity to a single client
 	plum->r.svFlags |= SVF_SINGLECLIENT;
 	plum->r.singleClient = ent->s.number;
+	// only send this temp entity to spectators following client
+	if (!g_damagePlums.integer)
+		mv_entities[plum->s.number].mvFlags |= MVF_SPECONLY;
 	//
 	plum->s.otherEntityNum = ent->s.number;
 	plum->s.time = score;
@@ -3051,6 +3054,8 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	int			knockback;
 	int			max;
 	int			subamt = 0;
+	int			oldHealth = targ->health;
+	int			oldArmor = 0;
 	float		famt = 0;
 	float		hamt = 0;
 	float		shieldAbsorbed = 0;
@@ -3129,6 +3134,8 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		if ( client->noclip ) {
 			return;
 		}
+
+		oldArmor = client->ps.stats[STAT_ARMOR];
 	}
 
 	if ( !dir ) {
@@ -3505,10 +3512,10 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	if (take) {
 		if (targ->client && (targ->client->ps.fd.forcePowersActive & (1 << FP_RAGE)) && (inflictor->client || attacker->client))
 		{
-			take /= (targ->client->ps.fd.forcePowerLevel[FP_RAGE]+1);
+			take /= (targ->client->ps.fd.forcePowerLevel[FP_RAGE] + 1);
 		}
 		targ->health = targ->health - take;
-		if ( targ->client ) {
+		if (targ->client) {
 			targ->client->ps.stats[STAT_HEALTH] = targ->health;
 		}
 
@@ -3523,15 +3530,15 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 				targ->client->ps.stats[STAT_HEALTH] = 1;
 			}
 		}
-	
-		if ( targ->health <= 0 ) {
-			if ( client )
+
+		if (targ->health <= 0) {
+			if (client)
 			{
 				targ->flags |= FL_NO_KNOCKBACK;
 
 				if (point)
 				{
-					VectorCopy( point, targ->pos1 );
+					VectorCopy(point, targ->pos1);
 				}
 				else
 				{
@@ -3547,20 +3554,67 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 				targ->health = -999;
 
 			// If we are a breaking glass brush, store the damage point so we can do cool things with it.
-			if ( targ->r.svFlags & SVF_GLASS_BRUSH )
+			if (targ->r.svFlags & SVF_GLASS_BRUSH)
 			{
-				VectorCopy( point, targ->pos1 );
-				VectorCopy( dir, targ->pos2 );
+				VectorCopy(point, targ->pos1);
+				VectorCopy(dir, targ->pos2);
 			}
 
 			targ->enemy = attacker;
-			targ->die (targ, inflictor, attacker, take, mod);
+			targ->die(targ, inflictor, attacker, take, mod);
 			return;
-		} else if ( targ->pain ) {
-			targ->pain (targ, attacker, take);
 		}
+		else if (targ->pain) {
+			targ->pain(targ, attacker, take);
+		}
+	}
+
+	if (client && attacker->client)
+	{
+		// all damage types must sum up to the total health of players!
+		if (oldHealth <= 0)
+			return; // we were dead to begin with
+		else if (targ->health <= 0)
+			take = oldHealth;
+		else
+			take = oldHealth - targ->health;
+
+		take += oldArmor - client->ps.stats[STAT_ARMOR];
+
+		if (take == 0)
+			return;
+
+		if (g_damagePlums.integer || g_mvapi)
+			ScorePlum(attacker, client->ps.origin, take);
+
+		/*
+		// don't log damage stats
+		if (level.warmupTime || level.intermissiontime || level.roundQueued)
+			return;
 
 		G_LogWeaponDamage(attacker->s.number, mod, take);
+
+		if (client == attacker->client || OnSameTeam(targ, attacker)) {
+			client->pers.totalDamageTakenFromAllies += take;
+			attacker->client->pers.totalDamageDealtToAllies += take;
+		}
+		else {
+			client->pers.totalDamageTakenFromEnemies += take;
+
+			if (GT_Round(level.gametype)) {
+				int	oldScore, newScore;
+
+				oldScore = attacker->client->pers.totalDamageDealtToEnemies / RND_DAMAGE_SCORE;
+				attacker->client->pers.totalDamageDealtToEnemies += take;
+				newScore = attacker->client->pers.totalDamageDealtToEnemies / RND_DAMAGE_SCORE;
+
+				if (newScore != oldScore)
+					AddScore(attacker, targ->r.currentOrigin, newScore - oldScore);
+			}
+			else {
+				attacker->client->pers.totalDamageDealtToEnemies += take;
+			}
+		}*/
 	}
 
 }

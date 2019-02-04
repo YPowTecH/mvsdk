@@ -11,6 +11,11 @@ int AcceptBotCommand(char *cmd, gentity_t *pl);
 void BG_CycleInven(playerState_t *ps, int direction);
 void BG_CycleForce(playerState_t *ps, int direction);
 
+void Cmd_Queue_f(gentity_t *ent);
+void Cmd_JoinQueue_f(gentity_t *ent);
+void Cmd_LeaveQueue_f(gentity_t *ent);
+void Cmd_ScoreQueue_f(gentity_t *ent);
+
 /*
 ==================
 DeathmatchScoreboardMessage
@@ -2354,6 +2359,23 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 	}
 }
 
+static void Cmd_AddBot_f(gentity_t *ent)
+{
+	trap_SendServerCommand(ent - g_entities, va("print \"%s.\n\"", G_GetStripEdString("SVINGAME", "ONLY_ADD_BOTS_AS_SERVER")));
+}
+
+static void Cmd_HeadExplodey_f(gentity_t *ent)
+{
+	Cmd_Kill_f(ent);
+	if (ent->health < 1)
+	{
+		float presaveVel = ent->client->ps.velocity[2];
+		ent->client->ps.velocity[2] = 500;
+		DismembermentTest(ent);
+		ent->client->ps.velocity[2] = presaveVel;
+	}
+}
+
 void PM_SetAnim(int setAnimParts,int anim,int setAnimFlags, int blendTime);
 
 #ifdef _DEBUG
@@ -2482,8 +2504,8 @@ by PowTecH
 */
 void Cmd_Register_f(gentity_t *ent) {
 	char username[MAX_NETNAME], password1[80], password2[80];
-	char userfile[MAX_QPATH];
-	char userwrite[MAX_QPATH];
+	char userfile[MAX_TOKEN_CHARS];
+	char userwrite[MAX_TOKEN_CHARS];
 
 	fileHandle_t	f;
 	trap_Argv(1, username, sizeof(username));
@@ -2517,7 +2539,7 @@ void Cmd_Register_f(gentity_t *ent) {
 	}
 
 	// Check that username doesn't exist.
-	Com_sprintf(userfile, 1024 * 4, "users/%s.cfg", username);
+	Com_sprintf(userfile, sizeof(userfile), "users/%s.cfg", username);
 	trap_FS_FOpenFile(userfile, &f, FS_READ);
 
 	if (f) {
@@ -2604,7 +2626,7 @@ void Cmd_Login_f(gentity_t *ent) {
 	}
 
 	// Check that the username exist.
-	Com_sprintf(userfile, MAX_TOKEN_CHARS, "users/%s.cfg", username);
+	Com_sprintf(userfile, sizeof(userfile), "users/%s.cfg", username);
 	trap_FS_FOpenFile(userfile, &f, FS_READ);
 
 	if (f) {
@@ -2659,7 +2681,7 @@ void Cmd_Logout_f(gentity_t *ent) {
 		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7You are not logged in^1]^7\n\""));
 	}
 	else {
-		Com_sprintf(userfile, MAX_TOKEN_CHARS, "users/%s.cfg", ent->client->sess.userlogged);
+		Com_sprintf(userfile, sizeof(userfile), "users/%s.cfg", ent->client->sess.userlogged);
 		trap_FS_FOpenFile(userfile, &f, FS_READ);
 
 		if (f) {
@@ -2824,7 +2846,7 @@ static const clientCommand_t commands[] = {
 	{ "teamtask", Cmd_TeamTask_f, CMD_CHEAT | CMD_NOINTERMISSION },
 	{ "levelshot", Cmd_LevelShot_f, CMD_CHEAT | CMD_ALIVE | CMD_NOINTERMISSION },
 	//{ "thedestroyer", Cmd_TheDestroyer_f, CMD_CHEAT | CMD_ALIVE | CMD_NOINTERMISSION },
-	//{ "addbot", Cmd_AddBot_f, 0 },
+	{ "addbot", Cmd_AddBot_f, 0 },
 	//By PowTecH - am commands
 	{ "amregister", Cmd_Register_f, CMD_NOINTERMISSION },
 	{ "amlogin", Cmd_Login_f, CMD_NOINTERMISSION },
