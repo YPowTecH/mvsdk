@@ -2715,8 +2715,8 @@ void Cmd_HouseList_f(gentity_t *ent) {
 	for (i = 0; i < count; i++) {
 		if (Q_stricmp(ent_list[i]->classname, "pow_house") == 0) {
 			hit++;
-			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%s ^7- ^2$^7%i^5]^7\n\"",
-				ent_list[i]->message, ent_list[i]->boltpoint2));
+			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%i^5][^7%s ^7- ^2$^7%i^5]^7\n\"",
+				ent_list[i]->spawnflags, ent_list[i]->message, ent_list[i]->boltpoint2));
 		}
 	}
 
