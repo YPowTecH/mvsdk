@@ -2506,15 +2506,36 @@ void help_writeSys_f(gentity_t *ent, char *userfile) {
 	trap_FS_FCloseFile(f);
 }
 
-char *strrep(char *str, char find, char replace) {
-	int i;
+void help_writeHouse_f(gentity_t *ent, char *userfile) {
+	int i, j;
+	char userwrite[MAX_TOKEN_CHARS];
+	fileHandle_t	f;
 
-	for (i = 0; str[i] != '\0'; i++) {
-		if (str[i] == find) {
-			str[i] = replace;
+	char tempName[MAX_TOKEN_CHARS];
+
+	strcpy(tempName, level.houseList[0].name);
+	strcpy(tempName, strrep(tempName, ' ', '_'));
+
+	trap_FS_FOpenFile(userfile, &f, FS_WRITE);
+	Com_sprintf(userwrite, sizeof(userwrite), "%i %s %i %i %i ",
+		level.houseList[0].id, tempName, level.houseList[0].buy,
+		level.houseList[0].sell, level.houseList[0].ownerId);
+	trap_FS_Write(userwrite, strlen(userwrite), f);
+	trap_FS_FCloseFile(f);
+
+	trap_FS_FOpenFile(userfile, &f, FS_APPEND);
+	for (i = 1; i < ARRAY_LEN(level.houseList); i++) {
+		if (!level.houseList[i].id) {
+			break;
 		}
+		strcpy(tempName, level.houseList[i].name);
+		strcpy(tempName, strrep(tempName, ' ', '_'));
+		Com_sprintf(userwrite, sizeof(userwrite), "%i %s %i %i %i ",
+			level.houseList[i].id, tempName, level.houseList[i].buy,
+			level.houseList[i].sell, level.houseList[i].ownerId);
+		trap_FS_Write(userwrite, strlen(userwrite), f);
 	}
-	return str;
+	trap_FS_FCloseFile(f);
 }
 
 /*
@@ -2798,13 +2819,15 @@ void Cmd_HouseList_f(gentity_t *ent) {
 			break;
 		}
 		h = level.houseList[i];
-		strcpy(h.name, strrep(h.name, '_', ' '));
 
-		if (h.ownerId > 0) {
-			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%i^5]^5 ^7%s ^7- ^2$^7%i^5] ^1[OWNED]^7\n\"", h.id, h.name, h.buy));
+		if (h.ownerId > 0 && h.ownerId == ent->client->sess.id) {
+			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%i^5] [^7%s ^7- ^2$^7%i^5] ^2[OWNED]^7\n\"", h.id, h.name, h.buy));
+		}
+		else if (h.ownerId > 0) {
+			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%i^5] [^7%s ^7- ^2$^7%i^5] ^1[OWNED]^7\n\"", h.id, h.name, h.buy));
 		}
 		else {
-			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%i^5]^5 ^7%s ^7- ^2$^7%i^5]^7\n\"", h.id, h.name, h.buy));
+			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%i^5] [^7%s ^7- ^2$^7%i^5]^7\n\"", h.id, h.name, h.buy));
 		}
 	}
 }
@@ -2815,32 +2838,61 @@ By PowTecH - RPG: House Buy
 =================
 */
 void Cmd_HouseBuy_f(gentity_t *ent) {
-	int i = 8192, count;
-	gentity_t *ent_list[MAX_GENTITIES];
+	int i;
+	houseList_t h;
 	char houseID[7] = "";
 
-	if (ent->client->sess.houseID != 0) {
-		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Have to sell your house first - ^1/^7pjsellhouse %i^1]^7\n\"", ent->client->sess.houseID));
-		return;
-	}
+	char userfile[MAX_TOKEN_CHARS];
+	fileHandle_t	f;
 
 	trap_Argv(1, houseID, sizeof(houseID));
 
-	count = G_RadiusList(ent->r.currentOrigin, i, ent, qfalse, ent_list);
-	for (i = 0; i < count; i++) {
-		if (Q_stricmp(ent_list[i]->classname, "pow_house") == 0 && ent_list[i]->spawnflags == atoi(houseID)) {
-			if (ent->client->sess.money >= ent_list[i]->boltpoint1) {
-				ent->client->sess.money -= ent_list[i]->boltpoint1;
-				ent->client->sess.houseID = ent_list[i]->spawnflags;
-				trap_SendServerCommand(ent - g_entities, va("print \"^2[^7'%s^7' Purchased^2]^7\n\"", ent_list[i]->message));
+	if (Q_stricmp(houseID, "") == 0) {
+		trap_SendServerCommand(ent - g_entities, va("print \"^1/^7pjbuyhouse ^1<^7id^1>^7\n\"", houseID));
+		return;
+	}
+
+	for (i = 0; i < ARRAY_LEN(level.houseList); i++) {
+		if (!level.houseList[i].id) {
+			break;
+		}
+		h = level.houseList[i];
+
+		//found the house they were looking for
+		if (h.id == atoi(houseID)) {
+			//you already own this house
+			if (h.ownerId > 0 && h.ownerId == ent->client->sess.id) {
+				trap_SendServerCommand(ent - g_entities, va("print \"^2[^7You already own this house^2]^7\n\""));
+				return;
 			}
-			else {
-				trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Not enough money ^1- ^7%i^1/^7%i^1]^7\n\"",ent->client->sess.money, ent_list[i]->boltpoint1));
+			//someone already owns that house
+			else if (h.ownerId > 0) {
+				trap_SendServerCommand(ent - g_entities, va("print \"^1[^7House already owned^1]^7\n\""));
+				return;
 			}
+
+			//dont have enough money
+			if (ent->client->sess.money < h.buy) {
+				trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Not enough money ^1- ^7%i^1/^7%i^1]^7\n\"", ent->client->sess.money, h.buy));
+				return;
+			}
+
+			//take their money
+			ent->client->sess.money -= h.buy;
+			//give them the house
+			level.houseList[i].ownerId = ent->client->sess.id;
+
+			Com_sprintf(userfile, sizeof(userfile), "rpg/houses/csgo.cfg", i);
+			trap_FS_FOpenFile(userfile, &f, FS_READ);
+			if (f) {
+				trap_FS_FCloseFile(f);
+				help_writeHouse_f(ent, userfile);
+			}
+
+			trap_SendServerCommand(ent - g_entities, va("print \"^2[^7'%s^7' purchased for ^7'^1-$%i^7'^2]^7\n\"", h.name, h.buy));
 			return;
 		}
 	}
-
 	trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Couldn't find house number '^1%s^7'^1]^7\n\"", houseID));
 }
 
@@ -2850,25 +2902,51 @@ By PowTecH - RPG: House Sell
 =================
 */
 void Cmd_HouseSell_f(gentity_t *ent) {
-	int i = 8192, count;
-	gentity_t *ent_list[MAX_GENTITIES];
+	int i;
+	houseList_t h;
+	char houseID[7] = "";
 
-	if (ent->client->sess.houseID <= 0) {
-		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Don't have a house to sell^1]^7\n\""));
+	char userfile[MAX_TOKEN_CHARS];
+	fileHandle_t	f;
+
+	trap_Argv(1, houseID, sizeof(houseID));
+
+	if (Q_stricmp(houseID, "") == 0) {
+		trap_SendServerCommand(ent - g_entities, va("print \"^1/^7pjsellhouse ^1<^7id^1>^7\n\"", houseID));
 		return;
 	}
 
-	count = G_RadiusList(ent->r.currentOrigin, i, ent, qfalse, ent_list);
-	for (i = 0; i < count; i++) {
-		if (Q_stricmp(ent_list[i]->classname, "pow_house") == 0 && ent_list[i]->spawnflags == ent->client->sess.houseID) {
-			ent->client->sess.money += ent_list[i]->boltpoint2;
-			ent->client->sess.houseID = 0;
-			trap_SendServerCommand(ent - g_entities, va("print \"^2[^7'%s^7' Sold for ^2$^7%i^2]^7\n\"", ent_list[i]->message, ent_list[i]->boltpoint2));
+	for (i = 0; i < ARRAY_LEN(level.houseList); i++) {
+		if (!level.houseList[i].id) {
+			break;
+		}
+		h = level.houseList[i];
+
+		//found the house they were looking for
+		if (h.id == atoi(houseID)) {
+			//someone else owns that house
+			if (h.ownerId != ent->client->sess.id || h.ownerId == 0) {
+				trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Don't own house^1]^7\n\""));
+				return;
+			}
+
+			//take their money
+			ent->client->sess.money += h.sell;
+			//give them the house
+			level.houseList[i].ownerId = 0;
+
+			Com_sprintf(userfile, sizeof(userfile), "rpg/houses/csgo.cfg", i);
+			trap_FS_FOpenFile(userfile, &f, FS_READ);
+			if (f) {
+				trap_FS_FCloseFile(f);
+				help_writeHouse_f(ent, userfile);
+			}
+
+			trap_SendServerCommand(ent - g_entities, va("print \"^2[^7'%s^7' sold for ^7'^2+$%i^7'^2]^7\n\"", h.name, h.sell));
 			return;
 		}
 	}
-
-	trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Couldn't find your house^1]^7\n\""));
+	trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Couldn't find house number '^1%s^7'^1]^7\n\"", houseID));
 }
 
 /*

@@ -333,6 +333,7 @@ static int gameCvarTableSize = sizeof( gameCvarTable ) / sizeof( gameCvarTable[0
 
 
 char *Twimod_Splitstring(char *stringNew, char split);
+char *strrep(char *str, char find, char replace);
 void G_InitGame					( int levelTime, int randomSeed, int restart );
 void G_RunFrame					( int levelTime );
 void G_ShutdownGame				( int restart );
@@ -744,6 +745,17 @@ char *Twimod_Splitstring(char *stringNew, char split) {
 	return retPtr;
 }
 
+char *strrep(char *str, char find, char replace) {
+	int i;
+
+	for (i = 0; str[i] != '\0'; i++) {
+		if (str[i] == find) {
+			str[i] = replace;
+		}
+	}
+	return str;
+}
+
 /*
 ============
 G_InitGame
@@ -964,6 +976,7 @@ void G_InitGame(int levelTime, int randomSeed, int restart) {
 		while (i > 0) {
 			level.houseList[j].id = i;
 			strcpy(level.houseList[j].name, Twimod_Splitstring(NULL, ' '));
+			strcpy(level.houseList[j].name, strrep(level.houseList[j].name, '_', ' '));//clear the underscores
 			level.houseList[j].buy = atoi(Twimod_Splitstring(NULL, ' '));
 			level.houseList[j].sell = atoi(Twimod_Splitstring(NULL, ' '));
 			level.houseList[j].ownerId = atoi(Twimod_Splitstring(NULL, ' '));

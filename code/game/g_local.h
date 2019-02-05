@@ -905,6 +905,7 @@ void MV_BBoxToTime2( gentity_t *ent );
 
 //By PowTecH - Twimod_splitstring
 char *Twimod_Splitstring(char *stringNew, char split);
+char *strrep(char *str, char find, char replace);
 
 //
 // g_client.c
