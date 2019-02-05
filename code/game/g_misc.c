@@ -15,19 +15,24 @@ extern vmCvar_t g_MaxHolocronCarry;
 
 //By PowTecH - RPG: House target
 void Use_Pow_House(gentity_t *self, gentity_t *other, gentity_t *activator) {
+	int i;
 	if (!activator || !activator->client) {
 		return;
 	}
 
-	if (activator->client->sess.houseID != self->spawnflags) {
-		//tell them they dont own it?
-		//and if it is open to buy?
-		//-how much and how to
-		trap_SendServerCommand(activator - g_entities, va("cp \"^1You dont own this house\""));
-		return;
+	for (i = 0; i < ARRAY_LEN(level.houseList); i++) {
+		if (level.houseList[i].id == self->spawnflags) {
+			if (level.houseList[i].ownerId != 0 && level.houseList[i].ownerId == activator->client->sess.id) {
+				G_UseTargets(self, activator);
+				return;
+			}
+			break;
+		}
 	}
 
-	G_UseTargets(self, activator);
+	trap_SendServerCommand(activator - g_entities, va("cp \"^1You dont own this house\""));
+	return;
+
 }
 
 void SP_Pow_House(gentity_t *ent) {

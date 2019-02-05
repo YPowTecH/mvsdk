@@ -2486,13 +2486,35 @@ void help_write_f(gentity_t *ent, char *userfile) {
 	fileHandle_t	f;
 
 	trap_FS_FOpenFile(userfile, &f, FS_WRITE);
-	Com_sprintf(userwrite, sizeof(userwrite), "%s %s %i %i %i %i %i %i %i %s %s ",
-		ent->client->sess.password, ent->client->sess.displayName, ent->client->sess.money,
+	Com_sprintf(userwrite, sizeof(userwrite), "%s %s %s %i %i %i %i %i %i %i %s %s ",
+		ent->client->sess.userlogged, ent->client->sess.password, ent->client->sess.displayName, ent->client->sess.money,
 		ent->client->sess.sDuelW, ent->client->sess.sDuelL, ent->client->sess.sK,
 		ent->client->sess.sD, ent->client->sess.sTime,
 		ent->client->sess.powerLevel, ent->client->sess.powerBit, ent->client->sess.emoteBit);
 	trap_FS_Write(userwrite, strlen(userwrite), f);
 	trap_FS_FCloseFile(f);
+}
+
+void help_writeSys_f(gentity_t *ent, char *userfile) {
+	char userwrite[MAX_TOKEN_CHARS];
+	fileHandle_t	f;
+
+	trap_FS_FOpenFile(userfile, &f, FS_WRITE);
+	Com_sprintf(userwrite, sizeof(userwrite), "%i ",
+		level.dbUserCount);
+	trap_FS_Write(userwrite, strlen(userwrite), f);
+	trap_FS_FCloseFile(f);
+}
+
+char *strrep(char *str, char find, char replace) {
+	int i;
+
+	for (i = 0; str[i] != '\0'; i++) {
+		if (str[i] == find) {
+			str[i] = replace;
+		}
+	}
+	return str;
 }
 
 /*
@@ -2503,9 +2525,12 @@ by PowTecH
 =================
 */
 void Cmd_Register_f(gentity_t *ent) {
+	int i, len;
 	char username[MAX_NETNAME], password1[80], password2[80];
 	char userfile[MAX_TOKEN_CHARS];
+	char sysfile[MAX_TOKEN_CHARS];
 	char userwrite[MAX_TOKEN_CHARS];
+	char buffer[MAX_TOKEN_CHARS] = "";
 
 	fileHandle_t	f;
 	trap_Argv(1, username, sizeof(username));
@@ -2538,43 +2563,56 @@ void Cmd_Register_f(gentity_t *ent) {
 		return;
 	}
 
-	// Check that username doesn't exist.
-	Com_sprintf(userfile, sizeof(userfile), "users/%s.cfg", username);
-	trap_FS_FOpenFile(userfile, &f, FS_READ);
+	//Have to check each user
+	for (i = 1; i <= level.dbUserCount; i++) {
+		Com_sprintf(userfile, sizeof(userfile), "users/%i.cfg", i);
+		trap_FS_FOpenFile(userfile, &f, FS_READ);
+		//found a player with this id
+		if (f) {
+			trap_FS_FCloseFile(f);
+			len = trap_FS_FOpenFile(userfile, &f, FS_READ);
+			trap_FS_Read(buffer, len, f);
 
+			//check the username of that id'd player
+			if (Q_stricmp(Twimod_Splitstring(buffer, ' '), username) == 0) {
+				// We found this username, so we inform the user.
+				trap_SendServerCommand(ent - g_entities, va("print \"^1[^7User '^1%s^7' already exists^1]^7\n\"", username));
+				trap_FS_FCloseFile(f);
+				return;
+			}
+		}
+	}
+
+	//Update our database size tracker
+	level.dbUserCount++;
+	Com_sprintf(sysfile, sizeof(sysfile), "sys/sys.cfg");
+	trap_FS_FOpenFile(sysfile, &f, FS_READ);
+	//System file is still there
 	if (f) {
-		// We found this username, so we inform the user.
-		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7User '^1%s^7' already exists^1]^7\n\"", username));
 		trap_FS_FCloseFile(f);
+		help_writeSys_f(ent, sysfile);
+	}
+	else {
+		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Accounts not setup on this server^1]^7\n\""));
 		return;
 	}
-	else if (!f) {
-		// We are OK to creat the user
-		trap_FS_FCloseFile(f);
-		trap_FS_FOpenFile(userfile, &f, FS_APPEND);
-		Com_sprintf(userwrite, sizeof(userwrite), "%s %s 500 0 0 0 0 0 0 0 0 ", password1, ent->client->pers.netname);
-		trap_FS_Write(userwrite, strlen(userwrite), f);
-		trap_FS_FCloseFile(f);
-		trap_SendServerCommand(ent - g_entities, va("print \"^2[^7User '^2%s^7' with the password '^2%s^7' successfully created^2]^7\n\"", username, password1));
-		ent->client->sess.thisconnectuc = 1;
 
-		// We automatical login the user now
-		//strcpy(ent->client->sess.userlogged, username);
-		Q_strncpyz(ent->client->sess.userlogged, username, sizeof(ent->client->sess.userlogged));
-		//strcpy(ent->client->sess.userpass, password1);
+	//create a new user incrimented by one
+	Com_sprintf(userfile, sizeof(userfile), "users/%i.cfg", level.dbUserCount);
+	trap_FS_FOpenFile(userfile, &f, FS_APPEND);
+	Com_sprintf(userwrite, sizeof(userwrite), "%s %s %s 500 0 0 0 0 0 0 0 0 ", username, password1, ent->client->pers.netname);
+	trap_FS_Write(userwrite, strlen(userwrite), f);
+	trap_FS_FCloseFile(f);
+	trap_SendServerCommand(ent - g_entities, va("print \"^2[^7User '^2%s^7' with the password '^2%s^7' successfully created^2]^7\n\"", username, password1));
+	trap_SendServerCommand(ent - g_entities, va("print \"^2[^7You are now logged in as '^2%s^7' with level '^2%i^7' admin^2]^7\n\"", username, ent->client->sess.powerLevel));
 
-		trap_SendServerCommand(ent - g_entities, va("print \"^2[^7You are now logged in as '^2%s^7'^2]^7\n\"", username));
-		/*if ( twimod_loginpuplicmsg.integer == 1 ) {
-		  trap_SendServerCommand( -1, va("print \"%s ^7is now logged in as %s^7.\n\"", ent->client->pers.netname, ent->client->sess.userlogged));
-		}
-		else if ( twimod_loginpuplicmsg.integer == 2 ) {
-		  trap_SendServerCommand( -1, va("cp \"%s ^7is now logged in as %s^7.\n\"", ent->client->pers.netname, ent->client->sess.userlogged));
-		  trap_SendServerCommand( clientNum, va("print \"You are now logged in as %s^7.\n\"", username));
-		}
-		else {
-		  trap_SendServerCommand( clientNum, va("print \"You are now logged in as %s^7.\n\"", username));
-		}*/
-	}
+	//give the user all the properties that we saved to his profile
+	ent->client->sess.id = level.dbUserCount;
+	strcpy(ent->client->sess.password, password1);
+	strcpy(ent->client->sess.userlogged, username);
+	strcpy(ent->client->sess.displayName, ent->client->pers.netname);
+	ent->client->sess.thisconnectuc = 1;
+	ent->client->sess.logintrys = 0;
 }
 
 /*
@@ -2585,18 +2623,23 @@ by PowTecH
 =================
 */
 void Cmd_Login_f(gentity_t *ent) {
+	int i;
 	char username[MAX_NETNAME] = "";
 	char pass[MAX_NETNAME] = "";
-	char *passwordfile;
-
-	int len;
-
 	char buffer[MAX_TOKEN_CHARS] = "";
 	char userfile[MAX_TOKEN_CHARS] = "";
+	qboolean found = qfalse;
+	int len;
 	fileHandle_t	f;
 
 	trap_Argv(1, username, sizeof(username));
 	trap_Argv(2, pass, sizeof(pass));
+
+	// Dont bother looking for something that doesnt exist
+	if (level.dbUserCount <= 0) {
+		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7No users registered^1]^7\n\""));
+		return;
+	}
 
 	// Protect from brutforcing
 	ent->client->sess.logintrys++;
@@ -2625,44 +2668,61 @@ void Cmd_Login_f(gentity_t *ent) {
 		return;
 	}
 
-	// Check that the username exist.
-	Com_sprintf(userfile, sizeof(userfile), "users/%s.cfg", username);
-	trap_FS_FOpenFile(userfile, &f, FS_READ);
+	//Have to check each user
+	for (i = 1; i <= level.dbUserCount; i++) {
+		Com_sprintf(userfile, sizeof(userfile), "users/%i.cfg", i);
+		trap_FS_FOpenFile(userfile, &f, FS_READ);
+		//found a player with this id
+		if (f) {
+			trap_FS_FCloseFile(f);
+			len = trap_FS_FOpenFile(userfile, &f, FS_READ);
+			trap_FS_Read(buffer, len, f);
 
-	if (f) {
-		// We found this username, so we check the password!
-		trap_FS_FCloseFile(f);
-		len = trap_FS_FOpenFile(userfile, &f, FS_READ);
-		trap_FS_Read(buffer, len, f);
-
-
-		passwordfile = Twimod_Splitstring(buffer, ' ');
-		if (Q_stricmp(pass, passwordfile) == 0) {
-			strcpy(ent->client->sess.password, passwordfile);
-			strcpy(ent->client->sess.displayName, Twimod_Splitstring(NULL, ' '));
-			ent->client->sess.money = atoi(Twimod_Splitstring(NULL, ' '));
-			ent->client->sess.sDuelW = atoi(Twimod_Splitstring(NULL, ' '));
-			ent->client->sess.sDuelL = atoi(Twimod_Splitstring(NULL, ' '));
-			ent->client->sess.sK = atoi(Twimod_Splitstring(NULL, ' '));
-			ent->client->sess.sD = atoi(Twimod_Splitstring(NULL, ' '));
-			ent->client->sess.sTime = atoi(Twimod_Splitstring(NULL, ' '));
-			ent->client->sess.powerLevel = atoi(Twimod_Splitstring(NULL, ' '));
-			strcpy(ent->client->sess.powerBit, Twimod_Splitstring(NULL, ' '));
-			strcpy(ent->client->sess.emoteBit, Twimod_Splitstring(NULL, ' '));
-			strcpy(ent->client->sess.userlogged, username);
-			ent->client->sess.logintrys = 0;
-			trap_SendServerCommand(ent - g_entities, va("print \"^2[^7You are now logged in as '^2%s^7' with level '^2%i^7' admin^2]^7\n\"", username, ent->client->sess.powerLevel));
+			//check the username of that id'd player
+			if (Q_stricmp(Twimod_Splitstring(buffer, ' '), username) == 0) {
+				if (Q_stricmp(Twimod_Splitstring(NULL, ' '), pass) == 0) {
+					//we are done searching
+					trap_FS_FCloseFile(f);
+					found = qtrue;
+					break;
+				}
+				else {
+					//we are done searching
+					trap_FS_FCloseFile(f);
+					break;
+				}
+			}
 		}
-		else {
-			trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Wrong password^1]^7\n\""));
-		}
-		trap_FS_FCloseFile(f);
 	}
-	else if (!f) {
-		// User does not exist, so we inform the client.
-		trap_FS_FCloseFile(f);
-		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7User '^1%s^7' does not exist^1]^7\n\"", username));
+
+	//incorrect information
+	if (!found) {
+		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Incorrect username or password^1]^7\n\""));
+		return;
 	}
+
+	//use the id
+	Com_sprintf(userfile, sizeof(userfile), "users/%i.cfg", i);
+	len = trap_FS_FOpenFile(userfile, &f, FS_READ);
+	trap_FS_Read(buffer, len, f);
+
+	ent->client->sess.id = i;
+	strcpy(ent->client->sess.userlogged, username);
+	strcpy(ent->client->sess.password, pass);
+	strcpy(ent->client->sess.displayName, Twimod_Splitstring(NULL, ' '));
+	ent->client->sess.money = atoi(Twimod_Splitstring(NULL, ' '));
+	ent->client->sess.sDuelW = atoi(Twimod_Splitstring(NULL, ' '));
+	ent->client->sess.sDuelL = atoi(Twimod_Splitstring(NULL, ' '));
+	ent->client->sess.sK = atoi(Twimod_Splitstring(NULL, ' '));
+	ent->client->sess.sD = atoi(Twimod_Splitstring(NULL, ' '));
+	ent->client->sess.sTime = atoi(Twimod_Splitstring(NULL, ' '));
+	ent->client->sess.powerLevel = atoi(Twimod_Splitstring(NULL, ' '));
+	strcpy(ent->client->sess.powerBit, Twimod_Splitstring(NULL, ' '));
+	strcpy(ent->client->sess.emoteBit, Twimod_Splitstring(NULL, ' '));
+	ent->client->sess.logintrys = 0;
+	trap_SendServerCommand(ent - g_entities, va("print \"^2[^7You are now logged in as '^2%s^7' with level '^2%i^7' admin^2]^7\n\"", username, ent->client->sess.powerLevel));
+
+	trap_FS_FCloseFile(f);
 }
 
 /*
@@ -2673,33 +2733,55 @@ by PowTecH
 =================
 */
 void Cmd_Logout_f(gentity_t *ent) {
+	int i, len;
 	char userfile[MAX_TOKEN_CHARS];
 	char userwrite[MAX_TOKEN_CHARS];
+	char buffer[MAX_TOKEN_CHARS];
+	qboolean found = qfalse;
 
 	fileHandle_t	f;
 	if ((Q_stricmp(ent->client->sess.userlogged, "") == 0)) {
 		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7You are not logged in^1]^7\n\""));
+		return;
 	}
-	else {
-		Com_sprintf(userfile, sizeof(userfile), "users/%s.cfg", ent->client->sess.userlogged);
-		trap_FS_FOpenFile(userfile, &f, FS_READ);
 
+	//Have to check each user
+	for (i = 1; i <= level.dbUserCount; i++) {
+		Com_sprintf(userfile, sizeof(userfile), "users/%i.cfg", i);
+		trap_FS_FOpenFile(userfile, &f, FS_READ);
+		//found a player with this id
 		if (f) {
 			trap_FS_FCloseFile(f);
-			help_write_f(ent, userfile);
+			len = trap_FS_FOpenFile(userfile, &f, FS_READ);
+			trap_FS_Read(buffer, len, f);
 
-			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7Your information was saved^5]^7\n\""));
-			Q_strncpyz(ent->client->sess.userlogged, "", sizeof(ent->client->sess.userlogged));
-			Q_strncpyz(ent->client->sess.password, "", sizeof(ent->client->sess.password));
-			ent->client->sess.powerLevel = 0;
-			Q_strncpyz(ent->client->sess.powerBit, "", sizeof(ent->client->sess.powerBit));
-			Q_strncpyz(ent->client->sess.powerBit, "", sizeof(ent->client->sess.emoteBit));
-			trap_SendServerCommand(ent - g_entities, va("print \"^2[^7You are now logged out^2]^7\n\""));
-		}
-		else {
-			trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Your information was not saved^1]^7\n\""));
+			//check the username of that id'd player
+			if (Q_stricmp(Twimod_Splitstring(buffer, ' '), ent->client->sess.userlogged) == 0) {
+				if (Q_stricmp(Twimod_Splitstring(NULL, ' '), ent->client->sess.password) == 0) {
+					found = qtrue;
+					trap_FS_FCloseFile(f);
+					break;
+				}
+			}
 		}
 	}
+
+	if (!found) {
+		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Your account was deleted or modified^1]^7\n\""));
+		return;
+	}
+
+	help_write_f(ent, userfile);
+
+	trap_SendServerCommand(ent - g_entities, va("print \"^5[^7Your information was saved^5]^7\n\""));
+	ent->client->sess.id = 0;
+	Q_strncpyz(ent->client->sess.password, "", sizeof(ent->client->sess.password));
+	ent->client->sess.powerLevel = 0;
+	Q_strncpyz(ent->client->sess.powerBit, "", sizeof(ent->client->sess.powerBit));
+	Q_strncpyz(ent->client->sess.userlogged, "", sizeof(ent->client->sess.userlogged));
+	Q_strncpyz(ent->client->sess.displayName, "", sizeof(ent->client->sess.displayName));
+	Q_strncpyz(ent->client->sess.emoteBit, "", sizeof(ent->client->sess.emoteBit));
+	trap_SendServerCommand(ent - g_entities, va("print \"^2[^7You are now logged out^2]^7\n\""));
 }
 
 /*
@@ -2708,22 +2790,25 @@ By PowTecH - RPG: House list
 =================
 */
 void Cmd_HouseList_f(gentity_t *ent) {
-	int i = 8192, count, hit;
-	gentity_t *ent_list[MAX_GENTITIES];
+	int i;
+	houseList_t h;
 
-	count = G_RadiusList(ent->r.currentOrigin, i, ent, qfalse, ent_list);
-	for (i = 0; i < count; i++) {
-		if (Q_stricmp(ent_list[i]->classname, "pow_house") == 0) {
-			hit++;
-			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%i^5][^7%s ^7- ^2$^7%i^5]^7\n\"",
-				ent_list[i]->spawnflags, ent_list[i]->message, ent_list[i]->boltpoint1));
+	for (i = 0; i < ARRAY_LEN(level.houseList); i++) {
+		if (!level.houseList[i].id) {
+			break;
+		}
+		h = level.houseList[i];
+		strcpy(h.name, strrep(h.name, '_', ' '));
+
+		if (h.ownerId > 0) {
+			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%i^5]^5 ^7%s ^7- ^2$^7%i^5] ^1[OWNED]^7\n\"", h.id, h.name, h.buy));
+		}
+		else {
+			trap_SendServerCommand(ent - g_entities, va("print \"^5[^7%i^5]^5 ^7%s ^7- ^2$^7%i^5]^7\n\"", h.id, h.name, h.buy));
 		}
 	}
-
-	if (hit <= 0) {
-		trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Couldn't find any houses near by^1]^7\n\""));
-	}
 }
+
 /*
 =================
 By PowTecH - RPG: House Buy
@@ -2759,6 +2844,11 @@ void Cmd_HouseBuy_f(gentity_t *ent) {
 	trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Couldn't find house number '^1%s^7'^1]^7\n\"", houseID));
 }
 
+/*
+=================
+By PowTecH - RPG: House Sell
+=================
+*/
 void Cmd_HouseSell_f(gentity_t *ent) {
 	int i = 8192, count;
 	gentity_t *ent_list[MAX_GENTITIES];
@@ -2780,6 +2870,7 @@ void Cmd_HouseSell_f(gentity_t *ent) {
 
 	trap_SendServerCommand(ent - g_entities, va("print \"^1[^7Couldn't find your house^1]^7\n\""));
 }
+
 /*
 =================
 By PowTecH - Queue

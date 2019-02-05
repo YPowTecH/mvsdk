@@ -311,6 +311,7 @@ typedef struct {
 	qboolean	teamLeader;			// true when this client is a team leader
 
 	//By PowTecH - Account
+	int			id;
 	char		password[MAX_NETNAME];
 	int			powerLevel;
 	char		powerBit[MAX_TOKEN_CHARS];
@@ -476,6 +477,14 @@ struct gclient_s {
 #define	MAX_SPAWN_VARS_CHARS	4096
 
 typedef struct {
+	int		id;
+	char	name[MAX_NETNAME];
+	int		buy;
+	int		sell;
+	int		ownerId;
+} houseList_t;
+
+typedef struct {
 	struct gclient_s	*clients;		// [maxclients]
 
 	struct gentity_s	*gentities;
@@ -560,6 +569,12 @@ typedef struct {
 
 	// MVSDK
 	qboolean	bboxEncoding;
+
+	//By PowTecH - System: General Information
+	int			dbUserCount;
+
+	//By PowTecH - RPG: House List
+	houseList_t	houseList[MAX_TOKEN_CHARS];
 
 	//By PowTecH - Queue
 	int			queueCount; //how many ppl are in queue

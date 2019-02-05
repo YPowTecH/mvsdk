@@ -750,8 +750,12 @@ G_InitGame
 
 ============
 */
-void G_InitGame( int levelTime, int randomSeed, int restart ) {
-	int					i;
+void G_InitGame(int levelTime, int randomSeed, int restart) {
+	int					i, j;
+	char userfile[MAX_TOKEN_CHARS] = "";
+	char buffer[MAX_TOKEN_CHARS] = "";
+	int len;
+	fileHandle_t	f;
 
 	B_InitAlloc(); //make sure everything is clean
 
@@ -931,13 +935,52 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 		G_LogPrintf("Duel Tournament Begun: kill limit %d, win limit: %d\n", g_fraglimit.integer, g_duel_fraglimit.integer );
 	}
 
+	//By PowTecH - System: General Information
+	Com_sprintf(userfile, sizeof(userfile), "sys/sys.cfg");
+	trap_FS_FOpenFile(userfile, &f, FS_READ);
+
+	if (f) {
+		trap_FS_FCloseFile(f);
+		len = trap_FS_FOpenFile(userfile, &f, FS_READ);
+		trap_FS_Read(buffer, len, f);
+
+		level.dbUserCount = atoi(Twimod_Splitstring(buffer, ' '));
+	}
+
+	//By PowTecH - RPG: House List
+	//-PNOTE: ENSURE THAT THEIR IS A TRAILING SPACE IN THIS FILE
+	//	OTHERWISE IT WILL BE AN INF LOOP
+	Com_sprintf(userfile, sizeof(userfile), "rpg/houses/csgo.cfg");
+	trap_FS_FOpenFile(userfile, &f, FS_READ);
+
+	if (f) {
+		trap_FS_FCloseFile(f);
+		len = trap_FS_FOpenFile(userfile, &f, FS_READ);
+		trap_FS_Read(buffer, len, f);
+
+		j = 0;
+		i = atoi(Twimod_Splitstring(buffer, ' '));
+
+		while (i > 0) {
+			level.houseList[j].id = i;
+			strcpy(level.houseList[j].name, Twimod_Splitstring(NULL, ' '));
+			level.houseList[j].buy = atoi(Twimod_Splitstring(NULL, ' '));
+			level.houseList[j].sell = atoi(Twimod_Splitstring(NULL, ' '));
+			level.houseList[j].ownerId = atoi(Twimod_Splitstring(NULL, ' '));
+
+			i = atoi(Twimod_Splitstring(NULL, ' '));
+			j++;
+		}
+		trap_FS_FCloseFile(f);
+	}
+
 	//By PowTecH - inQueue init
 	for (i = 0; i < MAX_CLIENTS; i++) {
 		level.inQueue[i] = -1;
 	}
 	//By PowTecH - red and blue team init
+	j = 0;
 	for (i = 0; i < 16; i++) {
-		int j;
 		for (j = 0; j < MAX_CLIENTS; j++) {
 			level.redTeam[i][j] = -1;
 			level.blueTeam[i][j] = -1;
