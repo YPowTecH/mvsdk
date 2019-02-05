@@ -23,16 +23,16 @@ void Use_Pow_House(gentity_t *self, gentity_t *other, gentity_t *activator) {
 	for (i = 0; i < ARRAY_LEN(level.houseList); i++) {
 		if (level.houseList[i].id == self->spawnflags) {
 			if (level.houseList[i].ownerId != 0 && level.houseList[i].ownerId == activator->client->sess.id) {
+				trap_SendServerCommand(activator - g_entities, va("cp \"^7%s\n^2Unlocked\"", level.houseList[i].name));
 				G_UseTargets(self, activator);
 				return;
+			}
+			else {
+				trap_SendServerCommand(activator - g_entities, va("cp \"^7%s\n^1Locked\"", level.houseList[i].name));
 			}
 			break;
 		}
 	}
-
-	trap_SendServerCommand(activator - g_entities, va("cp \"^1You dont own this house\""));
-	return;
-
 }
 
 void SP_Pow_House(gentity_t *ent) {

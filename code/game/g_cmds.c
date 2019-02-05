@@ -2516,6 +2516,7 @@ void help_writeHouse_f(gentity_t *ent, char *userfile) {
 	strcpy(tempName, level.houseList[0].name);
 	strcpy(tempName, strrep(tempName, ' ', '_'));
 
+	//to clear the file
 	trap_FS_FOpenFile(userfile, &f, FS_WRITE);
 	Com_sprintf(userwrite, sizeof(userwrite), "%i %s %i %i %i ",
 		level.houseList[0].id, tempName, level.houseList[0].buy,
@@ -2523,6 +2524,7 @@ void help_writeHouse_f(gentity_t *ent, char *userfile) {
 	trap_FS_Write(userwrite, strlen(userwrite), f);
 	trap_FS_FCloseFile(f);
 
+	//to add the rest of the houses to the file
 	trap_FS_FOpenFile(userfile, &f, FS_APPEND);
 	for (i = 1; i < ARRAY_LEN(level.houseList); i++) {
 		if (!level.houseList[i].id) {
