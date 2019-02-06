@@ -24,7 +24,7 @@ void G_WriteClientSessionData( gclient_t *client ) {
 	const char	*s;
 	const char	*var;
 
-	s = va("%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i",
+	s = va("%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i",
 		client->sess.sessionTeam,
 		client->sess.spectatorTime,
 		client->sess.spectatorState,
@@ -45,6 +45,9 @@ void G_WriteClientSessionData( gclient_t *client ) {
 		client->sess.logintrys,
 		client->sess.powerLevel,
 		client->sess.powerBit,
+
+		//By PowTecH - Worlds
+		client->sess.world,
 
 		//By PowTecH - Stats
 		client->sess.sDuelW,
@@ -108,7 +111,7 @@ void G_ReadSessionData( gclient_t *client ) {
 	var = va( "session%i", (int)(client - level.clients) );
 	trap_Cvar_VariableStringBuffer( var, s, sizeof(s) );
 
-	sscanf( s, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i",
+	sscanf( s, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i",
 		&sessionTeam,                 // bk010221 - format
 		&client->sess.spectatorTime,
 		&spectatorState,              // bk010221 - format
@@ -129,6 +132,9 @@ void G_ReadSessionData( gclient_t *client ) {
 		&client->sess.logintrys,
 		&client->sess.powerLevel,
 		&powerBit,
+
+		//By PowTecH - Worlds
+		&client->sess.world,
 
 		//By PowTecH - Stats
 		&client->sess.sDuelW,

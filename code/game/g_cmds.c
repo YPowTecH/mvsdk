@@ -2474,7 +2474,7 @@ void StandardSetBodyAnim(gentity_t *self, int anim, int flags)
 	PM_SetAnim(SETANIM_BOTH, anim, flags, 0);
 }
 
-void DismembermentTest(gentity_t *self);
+//void DismembermentTest(gentity_t *self);
 
 #ifdef _DEBUG
 void DismembermentByNum(gentity_t *self, int num);
@@ -3054,6 +3054,73 @@ void Cmd_ScoreQueue_f(gentity_t *ent) {
 	trap_SendServerCommand(ent - g_entities, va("print \"^5[^1Red^7:^1%i^7 - ^4%i^7:^4Blue^5]^7 - %s\n\"", level.redScore[i], level.blueScore[i]));
 }
 
+void help_world_f(gentity_t *ent) {
+	gentity_t *other;
+	gentity_t *init;
+	int clientNum = ent->s.number;
+	int i;
+	int j;
+	int k;
+	//I ignore you
+	for (i = 0; i < MAX_CLIENTS; i++) {
+		if (g_entities[i].inuse && g_entities[i].client) {
+			int blame = g_entities[i].s.number;
+			other = &g_entities[i];
+
+			//save the location of the person entering worlds
+			//	so that we can update everyone else to this person new world
+			if (blame == clientNum) {
+				k = i;
+				init = &g_entities[i];
+			}
+			
+			//world entitie, self, same world, undecided world and we are in nf_world; we want to see
+			if (blame == ENTITYNUM_WORLD || blame == clientNum || 
+				other->client->sess.world == ent->client->sess.world || 
+				(!other->client->sess.world && ent->client->sess.world == NF_WORLD)) {
+				mv_entities[i].snapshotIgnore[clientNum] = 0;
+			}
+			else {
+				mv_entities[i].snapshotIgnore[clientNum] = 1;
+			}
+		}
+	}
+
+	//You ignore me
+	for (j = 0; j < MAX_CLIENTS; j++) {
+		if (g_entities[j].inuse && g_entities[j].client) {
+			int blame = g_entities[i].s.number;
+			other = &g_entities[i];
+
+			if (other->client->sess.world == init->client->sess.world ||
+				(init->client->sess.world == NF_WORLD && !other->client->sess.world)) {
+				mv_entities[k].snapshotIgnore[blame] = 0;
+			}
+			else {
+				mv_entities[k].snapshotIgnore[blame] = 1;
+			}
+		}
+	}
+}
+/*
+=================
+By PowTecH - Worlds
+=================
+*/
+void Cmd_World_f(gentity_t *ent) {
+	if (g_mvapi) {
+		if (ent->client->sess.world == NF_WORLD) {
+			ent->client->sess.world = FF_WORLD;
+			trap_SendServerCommand(ent - g_entities, va("print \"^2[^7FF World^2]^7\n\""));
+		}
+		else if (ent->client->sess.world == FF_WORLD || !ent->client->sess.world) {
+			ent->client->sess.world = NF_WORLD;
+			trap_SendServerCommand(ent - g_entities, va("print \"^2[^7NF World^2]^7\n\""));
+		}
+		help_world_f(ent);
+	}
+}
+
 #define CMD_NOINTERMISSION	0x01
 #define CMD_CHEAT			0x02
 #define CMD_ALIVE			0x04
@@ -3100,9 +3167,12 @@ static const clientCommand_t commands[] = {
 	{ "amregister", Cmd_Register_f, CMD_NOINTERMISSION },
 	{ "amlogin", Cmd_Login_f, CMD_NOINTERMISSION },
 	{ "amlogout", Cmd_Logout_f, CMD_NOINTERMISSION },
+	//By PowTecH - RPG: Houses commands
 	{ "pjhouses", Cmd_HouseList_f, CMD_NOINTERMISSION },
 	{ "pjbuyhouse", Cmd_HouseBuy_f, CMD_NOINTERMISSION },
 	{ "pjsellhouse", Cmd_HouseSell_f, CMD_NOINTERMISSION },
+	//By PowTecH - Worlds: commands
+	{ "amworld", Cmd_World_f, CMD_NOINTERMISSION },
 	/*#ifdef _DEBUG
 		{ "headexplodey", Cmd_HeadExplodey_f, CMD_CHEAT },
 		{ "g2animent", G_CreateExampleAnimEnt, CMD_CHEAT },

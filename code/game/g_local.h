@@ -320,6 +320,9 @@ typedef struct {
 	int			thisconnectuc;
 	int			logintrys;
 
+	//By PowTecH - Worlds
+	int			world;
+
 	//By PowTecH - Stats
 	int			sDuelW;
 	int			sDuelL;

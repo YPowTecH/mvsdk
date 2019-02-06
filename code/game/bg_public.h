@@ -112,6 +112,10 @@ Ghoul2 Insert End
 #error overflow: (CS_MAX) > MAX_CONFIGSTRINGS
 #endif
 
+//By PowTecH - Worlds: Define the two worlds
+#define FF_WORLD 536870912
+#define NF_WORLD 1073741824
+
 typedef enum {
 	G2_MODELPART_HEAD = 10,
 	G2_MODELPART_WAIST,
