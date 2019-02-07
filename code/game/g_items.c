@@ -1594,6 +1594,7 @@ gentity_t *LaunchItem( gitem_t *item, vec3_t origin, vec3_t velocity ) {
 
 	dropped->s.eType = ET_ITEM;
 	dropped->s.modelindex = item - bg_itemlist;	// store item number in modelindex
+	G_Printf("^2%i - %i = %i\n", item, bg_itemlist, item - bg_itemlist);
 	if (dropped->s.modelindex < 0)
 	{
 		dropped->s.modelindex = 0;

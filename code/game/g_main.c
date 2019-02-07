@@ -851,6 +851,35 @@ void G_InitGame(int levelTime, int randomSeed, int restart) {
 		G_Printf( "Not logging to disk.\n" );
 	}
 
+	//By PowTecH - BR: gun list
+	//-PNOTE: ENSURE THAT THEIR IS A TRAILING SPACE IN THIS FILE
+	//	OTHERWISE IT WILL BE AN INF LOOP
+	i = 0;
+	j = 0;
+	Com_sprintf(userfile, sizeof(userfile), "gametypes/br/guns.cfg");
+	trap_FS_FOpenFile(userfile, &f, FS_READ);
+
+	if (f) {
+		trap_FS_FCloseFile(f);
+		len = trap_FS_FOpenFile(userfile, &f, FS_READ);
+		trap_FS_Read(buffer, len, f);
+
+		j = 0;
+		i = atoi(Twimod_Splitstring(buffer, ' '));
+
+		while (i > 0) {
+			level.gunListCount++;
+			G_Printf("^5hit %i\n", level.gunListCount);
+			level.gunList[j].id = i;
+			level.gunList[j].rarity = atof(Twimod_Splitstring(NULL, ' '));
+			level.gunList[j].item = &bg_itemlist[i];
+
+			i = atoi(Twimod_Splitstring(NULL, ' '));
+			j++;
+		}
+		trap_FS_FCloseFile(f);
+	}
+
 	G_LogWeaponInit();
 
 	G_InitWorldSession();

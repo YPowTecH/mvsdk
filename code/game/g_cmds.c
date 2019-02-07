@@ -3102,6 +3102,7 @@ void help_world_f(gentity_t *ent) {
 		}
 	}
 }
+
 /*
 =================
 By PowTecH - Worlds
@@ -3124,7 +3125,6 @@ void Cmd_World_f(gentity_t *ent) {
 #define CMD_NOINTERMISSION	0x01
 #define CMD_CHEAT			0x02
 #define CMD_ALIVE			0x04
-#define CMD_REFEREE			0x08	// update these in cg_players.c::CG_RefereeMode
 
 typedef struct {
 	const char	*name;				// must be lower-case for comparing

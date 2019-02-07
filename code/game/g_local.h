@@ -479,6 +479,7 @@ struct gclient_s {
 #define	MAX_SPAWN_VARS			64
 #define	MAX_SPAWN_VARS_CHARS	4096
 
+//By PowTecH - RPG: houselist struct
 typedef struct {
 	int		id;
 	char	name[MAX_NETNAME];
@@ -486,6 +487,16 @@ typedef struct {
 	int		sell;
 	int		ownerId;
 } houseList_t;
+
+//By PowTecH - BR: RNG weapon spawns struct
+typedef struct {
+	//user given
+	int		id;
+	double	rarity;
+
+	//not
+	gitem_t *item;
+} gunList_t;
 
 typedef struct {
 	struct gclient_s	*clients;		// [maxclients]
@@ -578,6 +589,10 @@ typedef struct {
 
 	//By PowTecH - RPG: House List
 	houseList_t	houseList[MAX_TOKEN_CHARS];
+
+	//By PowTecH - BR: guns List
+	int			gunListCount;
+	gunList_t	gunList[MAX_TOKEN_CHARS];
 
 	//By PowTecH - Queue
 	int			queueCount; //how many ppl are in queue
@@ -795,6 +810,8 @@ void Touch_DoorTrigger( gentity_t *ent, gentity_t *other, trace_t *trace );
 
 //By PowTecH - Farming: resource spawn
 void Trigger_Pow_Resource(gentity_t *ent);
+//By PowTecH - BR: RNG weapon spawns
+void Trigger_Pow_Guns(gentity_t *ent);
 
 //
 // g_trigger.c

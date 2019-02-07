@@ -201,6 +201,8 @@ void SP_emplaced_gun( gentity_t *ent );
 void SP_Pow_House(gentity_t *ent);
 //By PowTecH - Farming: resource spawn
 void SP_Pow_Resource(gentity_t *ent);
+//By PowTecH - BR: RNG weapon spawns
+void SP_Pow_Guns(gentity_t *ent);
 
 spawn_t	spawns[] = {
 	// info entities don't do anything at all, but provide positional
@@ -297,6 +299,8 @@ spawn_t	spawns[] = {
 	{"pow_house", SP_Pow_House},
 	//By PowTecH - Farming: resource spawn
 	{"pow_resource", SP_Pow_Resource},
+	//By PowTecH - BR: RNG weapon spawns
+	{"pow_guns", SP_Pow_Guns},
 
 	{0, 0}
 };

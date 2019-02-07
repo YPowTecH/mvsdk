@@ -516,6 +516,22 @@ Gives shield energy when used.
 "chargerate" - rechage 1 point every this many milliseconds (default 3000)
 */
 
+/*
+14 - stun
+15 - saber
+16 - pistol
+17 - blaster
+18 - disruptor
+19 - bowcaster
+20 - heavy_repeater
+21 - demp2
+22 - weapon_flechette
+23 - weapon_rocket_launcher
+27 - thermal
+28 - laser_trap
+29 - detpack
+*/
+
 gitem_t	bg_itemlist[] = 
 {
 	{
