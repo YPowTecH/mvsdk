@@ -1857,6 +1857,10 @@ void ClientThink_real( gentity_t *ent ) {
 
 					//gogo
 					if (spawnPoint) {
+						target->client->ps.stats[STAT_WEAPONS] &= ~(1 << (WP_SABER));//minus the saber
+						target->client->ps.stats[STAT_WEAPONS] &= ~(1 << (WP_BRYAR_PISTOL));//minus the saber
+						target->client->ps.stats[STAT_WEAPONS] |= (1 << (WP_STUN_BATON));//plus a stun baton
+						target->client->ps.weapon = WP_STUN_BATON;
 						TeleportPlayer(target, spawnPoint->s.origin, spawnPoint->s.angles);
 					}
 					else {
