@@ -493,13 +493,20 @@ typedef struct {
 
 //By PowTecH - BR: RNG weapon spawns struct
 typedef struct {
-	//user given
+	//file given
 	int		id;
 	double	rarity;
 
 	//not
 	gitem_t *item;
 } gunList_t;
+
+//By PowTecH - BR: RNG force spawns struct
+typedef struct {
+	//file given
+	int		id;
+	double	rarity;
+} forceList_t;
 
 typedef struct {
 	struct gclient_s	*clients;		// [maxclients]
@@ -596,6 +603,8 @@ typedef struct {
 	//By PowTecH - BR: guns List
 	int			gunListCount;
 	gunList_t	gunList[MAX_TOKEN_CHARS];
+	int			forceListCount;
+	forceList_t	forceList[MAX_TOKEN_CHARS];
 	int			playersAlive[MAX_CLIENTS];
 	int			gameStarted;
 	int			brStartTime; //time until queue pop
@@ -818,6 +827,8 @@ void Touch_DoorTrigger( gentity_t *ent, gentity_t *other, trace_t *trace );
 void Trigger_Pow_Resource(gentity_t *ent);
 //By PowTecH - BR: RNG weapon spawns
 void Trigger_Pow_Guns(gentity_t *ent);
+//By PowTecH - BR: RNG force spawns
+void Trigger_Pow_Forces(gentity_t *ent);
 
 //
 // g_trigger.c

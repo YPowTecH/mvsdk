@@ -956,7 +956,70 @@ void Trigger_Pow_Guns(gentity_t *ent) {
 
 	trap_LinkEntity(other);
 }
+//
 
+//By PowTecH - BR: RNG force spawns
+void Pow_Forces(gentity_t *self, gentity_t *activator) {
+	gentity_t *newEnt;
+	int f;
+
+	if (!activator->client)
+	{
+		return;
+	}
+
+	if (!(activator->client->pers.cmd.buttons & BUTTON_USE))
+	{
+		return;
+	}
+
+	trap_UnlinkEntity(self);
+
+	activator->client->ps.forceRestricted = qfalse;
+	activator->client->ps.fd.forcePowerLevel[self->parent->count] = FORCE_LEVEL_3;
+	activator->client->ps.fd.forcePowersKnown |= (1 << self->parent->count);
+
+	G_FreeEntity(self->parent);
+	G_FreeEntity(self);
+}
+
+void Use_Pow_Forces(gentity_t *self, gentity_t *other, gentity_t *activator) {
+	Pow_Forces(self, activator);
+}
+
+void Touch_Pow_Forces(gentity_t *self, gentity_t *other, trace_t *trace) {
+	if (!other->client) {
+		return;
+	}
+	trap_SendServerCommand(other - g_entities, va("cp \"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPress 'use'\""));
+	Pow_Forces(self, other);
+}
+
+void Trigger_Pow_Forces(gentity_t *ent) {
+	gentity_t		*other;
+	vec3_t		mins, maxs;
+	// find the bounds of everything on the team
+	VectorCopy(ent->r.absmin, mins);
+	VectorCopy(ent->r.absmax, maxs);
+
+	maxs[0] += 16;
+	maxs[1] += 16;
+	maxs[2] += 16;
+
+	mins[0] -= 16;
+	mins[1] -= 16;
+	mins[2] -= 0;//dont pick up the force power under the floor
+
+	other = G_Spawn();
+	VectorCopy(mins, other->r.mins);
+	VectorCopy(maxs, other->r.maxs);
+	other->parent = ent;
+	other->r.contents = CONTENTS_TRIGGER;
+	other->touch = Touch_Pow_Forces;
+	other->use = Use_Pow_Forces;
+
+	trap_LinkEntity(other);
+}
 //
 
 /*

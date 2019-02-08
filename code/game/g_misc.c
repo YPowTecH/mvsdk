@@ -150,7 +150,8 @@ void SP_Pow_Forces(gentity_t *ent) {
 	k = irand(0, j);
 	wtf = level.time + i * k;
 	Rand_Init(wtf);
-	rng = (irand(0, (level.gunListCount - 1)) - 128);
+	ent->count = level.forceList[irand(0, (level.forceListCount - 1))].id;
+	rng = ent->count - 128;
 
 	ent->s.modelindex = rng;
 	VectorSet(ent->r.mins, mins[0], mins[1], mins[2]);
@@ -186,13 +187,10 @@ void SP_Pow_Forces(gentity_t *ent) {
 	G_SetOrigin(ent, ent->s.origin);
 	G_SetAngles(ent, ent->s.angles);
 
-	/*ent->nextthink = level.time + FRAMETIME;
-	ent->think = Trigger_Pow_Guns;*/
+	ent->nextthink = level.time + FRAMETIME;
+	ent->think = Trigger_Pow_Forces;
 
 	trap_LinkEntity(ent);
-
-	//ent->think = HolocronThink;
-	//ent->nextthink = level.time + 50;
 }
 
 /*QUAKED func_group (0 0 0) ?

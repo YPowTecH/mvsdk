@@ -871,7 +871,6 @@ void G_InitGame(int levelTime, int randomSeed, int restart) {
 
 		while (i > 0) {
 			level.gunListCount++;
-			G_Printf("^5hit %i\n", level.gunListCount);
 			level.gunList[j].id = i;
 			level.gunList[j].rarity = atof(Twimod_Splitstring(NULL, ' '));
 			level.gunList[j].item = &bg_itemlist[i];
@@ -879,6 +878,32 @@ void G_InitGame(int levelTime, int randomSeed, int restart) {
 			i = atoi(Twimod_Splitstring(NULL, ' '));
 			j++;
 		}
+		trap_FS_FCloseFile(f);
+	}
+	
+	//By PowTecH - BR: gun list
+	//-PNOTE: ENSURE THAT THEIR IS A TRAILING SPACE IN THIS FILE
+	//	OTHERWISE IT WILL BE AN INF LOOP
+	i = 0;
+	j = 0;
+	Com_sprintf(userfile, sizeof(userfile), "gametypes/br/forces.cfg");
+	trap_FS_FOpenFile(userfile, &f, FS_READ);
+
+	if (f) {
+		trap_FS_FCloseFile(f);
+		len = trap_FS_FOpenFile(userfile, &f, FS_READ);
+		trap_FS_Read(buffer, len, f);
+
+		j = 0;
+		i = atoi(Twimod_Splitstring(buffer, ' '));
+		do {
+			level.forceListCount++;
+			level.forceList[j].id = i;
+			level.forceList[j].rarity = atof(Twimod_Splitstring(NULL, ' '));
+
+			i = atoi(Twimod_Splitstring(NULL, ' '));
+			j++;
+		} while (i > 0);
 		trap_FS_FCloseFile(f);
 	}
 
