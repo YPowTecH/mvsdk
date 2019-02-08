@@ -987,12 +987,24 @@ void Pow_Forces(gentity_t *self, gentity_t *activator) {
 
 	trap_UnlinkEntity(self);
 
+	newEnt = G_Spawn();
+
+	newEnt->s.origin[0] = self->parent->s.origin[0];
+	newEnt->s.origin[1] = self->parent->s.origin[1];
+	newEnt->s.origin[2] = self->parent->s.origin[2];
+	newEnt->s.angles[0] = self->parent->s.angles[0];
+	newEnt->s.angles[1] = self->parent->s.angles[1];
+	newEnt->s.angles[2] = self->parent->s.angles[2];
+
 	activator->client->ps.forceRestricted = qfalse;
 	activator->client->ps.fd.forcePowerLevel[self->parent->count] = FORCE_LEVEL_3;
 	activator->client->ps.fd.forcePowersKnown |= (1 << self->parent->count);
 
 	G_FreeEntity(self->parent);
 	G_FreeEntity(self);
+
+	newEnt->think = SP_Pow_Forces;
+	newEnt->nextthink = level.time + FRAMETIME;
 }
 
 void Use_Pow_Forces(gentity_t *self, gentity_t *other, gentity_t *activator) {

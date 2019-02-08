@@ -3060,7 +3060,7 @@ void MV_BBoxToTime2( gentity_t *ent )
 
 //By PowTecH - Better way to handle starting a new game
 void G_PowNewGame(gentity_t *ent) {
-	int i = 0;
+	int i, j;
 	vec3_t  spawn_origin, spawn_angles;
 	gentity_t  *spawnPoint, *target;
 
@@ -3121,10 +3121,27 @@ void G_PowNewGame(gentity_t *ent) {
 
 					//gogo
 					if (spawnPoint) {
-						target->client->ps.stats[STAT_WEAPONS] &= ~(1 << (WP_SABER));//minus the saber
-						target->client->ps.stats[STAT_WEAPONS] &= ~(1 << (WP_BRYAR_PISTOL));//minus the saber
-						target->client->ps.stats[STAT_WEAPONS] |= (1 << (WP_STUN_BATON));//plus a stun baton
+						//Take all their guns away except stun_baton
+						for (j = 2; j < WP_NUM_WEAPONS; j++) {
+							target->client->ps.stats[STAT_WEAPONS] &= ~(1 << (j));
+						}
+
+						//if they dont already have it give them a stun_baton
+						target->client->ps.stats[STAT_WEAPONS] |= (1 << (WP_STUN_BATON));
+						//switch to the stun_baton
 						target->client->ps.weapon = WP_STUN_BATON;
+
+						//take all their force powers away
+						for (j = 0; j < 18; j++) {
+							if (j != 11 && j != 12 && j != 15 && j != 16) {
+								target->client->ps.fd.forcePowerLevel[j] = FORCE_LEVEL_0;
+								target->client->ps.fd.forcePowersKnown &= ~(1 << (j));
+							}
+						}
+
+						target->client->ps.stats[STAT_HEALTH] = target->health = target->client->ps.stats[STAT_MAX_HEALTH];
+						target->client->ps.stats[STAT_ARMOR] = target->client->ps.stats[STAT_MAX_HEALTH];
+						//go to ur spawn
 						TeleportPlayer(target, spawnPoint->s.origin, spawnPoint->s.angles);
 					}
 					else {
