@@ -2245,6 +2245,13 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
 	trap_LinkEntity (self);
 
+	//By PowTecH - BR: dont spawn till next round
+	//need to do this the proper way and leave behind a body and complete the death anim
+	if (g_powGame.integer == 1 && level.gameStarted) {
+		G_Printf("^1cant leave spec\n");
+		SetTeam(self, "spectator");
+	}
+
 }
 
 

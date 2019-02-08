@@ -340,6 +340,9 @@ typedef struct {
 	//By PowTecH - Ads
 	int			lastAd;
 
+	//By PowTecH - BR: dont spawn till next round
+	int			isDead;
+
 	//By PowTecH - queue
 	int			queueNum;
 	int			queueTeam;
@@ -593,6 +596,9 @@ typedef struct {
 	//By PowTecH - BR: guns List
 	int			gunListCount;
 	gunList_t	gunList[MAX_TOKEN_CHARS];
+	int			playersAlive[MAX_CLIENTS];
+	int			gameStarted;
+	int			brStartTime; //time until queue pop
 
 	//By PowTecH - Queue
 	int			queueCount; //how many ppl are in queue
@@ -1184,6 +1190,7 @@ extern	vmCvar_t	g_submodelWorkaround;
 //By PowTecH - Cvar's
 extern  vmCvar_t  g_adMessage;
 extern  vmCvar_t  g_adInterval;
+extern  vmCvar_t  g_powGame;
 
 void	trap_Printf( const char *fmt );
 Q_NORETURN void	trap_Error( const char *fmt );

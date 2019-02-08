@@ -203,6 +203,8 @@ void SP_Pow_House(gentity_t *ent);
 void SP_Pow_Resource(gentity_t *ent);
 //By PowTecH - BR: RNG weapon spawns
 void SP_Pow_Guns(gentity_t *ent);
+//By PowTecH - BR: RNG force spawns
+void SP_Pow_Forces(gentity_t *ent);
 
 spawn_t	spawns[] = {
 	// info entities don't do anything at all, but provide positional
@@ -301,7 +303,8 @@ spawn_t	spawns[] = {
 	{"pow_resource", SP_Pow_Resource},
 	//By PowTecH - BR: RNG weapon spawns
 	{"pow_guns", SP_Pow_Guns},
-
+	//By PowTecH - BR: RNG force spawns
+	{"pow_forces", SP_Pow_Forces},
 	{0, 0}
 };
 

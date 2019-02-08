@@ -148,6 +148,7 @@ vmCvar_t	g_MVSDK;
 //By PowTecH - Cvar's
 vmCvar_t  g_adMessage;
 vmCvar_t  g_adInterval;
+vmCvar_t  g_powGame;
 
 int gDuelist1 = -1;
 int gDuelist2 = -1;
@@ -326,6 +327,7 @@ static cvarTable_t		gameCvarTable[] = {
 	//By PowTecH - Cvar's
 	{ &g_adMessage, "g_adMessage", "Server Ad x)", CVAR_ARCHIVE, 0, qtrue },
 	{ &g_adInterval, "g_adInterval", "600000", CVAR_ARCHIVE, 0, qtrue },
+	{ &g_powGame, "g_powGame", "1", CVAR_ARCHIVE, 0, qtrue },
 };
 
 // bk001129 - made static to avoid aliasing
@@ -1034,9 +1036,12 @@ void G_InitGame(int levelTime, int randomSeed, int restart) {
 	//By PowTecH - Finished Game Flag
 	level.finishedGame = -1;
 
-	//By PowTecH - queueTime
+	//By PowTecH - MERC: queue time
 	level.queueTime = 20000;
 	level.queuePop = level.time + level.queueTime;
+
+	//By PowTecH - BR: time until start
+	level.brStartTime = level.time + level.queueTime;
 }
 
 
@@ -1435,6 +1440,14 @@ void CalculateRanks( void ) {
 	level.numNonSpectatorClients = 0;
 	level.numPlayingClients = 0;
 	level.numVotingClients = 0;		// don't count bots
+
+	//By PowTecH - BR: know who is alive
+	//clear array and init it to -1 
+	for (i = 0; i < MAX_CLIENTS; i++) {
+		level.playersAlive[i] = -1;
+	}
+	//
+
 	for ( i = 0; i < /*TEAM_NUM_TEAMS*/2; i++ ) { // TEAM_NUM_TEAMS is 4, numteamVotingClients has a size of [2]
 		level.numteamVotingClients[i] = 0;
 	}
@@ -1451,6 +1464,9 @@ void CalculateRanks( void ) {
 				if ( level.clients[i].pers.connected == CON_CONNECTED ) {
 					level.numPlayingClients++;
 					if ( !(g_entities[i].r.svFlags & SVF_BOT) ) {
+						//By PowTecH - BR: know who is alive and not a bot
+						level.playersAlive[level.numVotingClients] = i;
+						//
 						level.numVotingClients++;
 						if ( level.clients[i].sess.sessionTeam == TEAM_RED )
 							level.numteamVotingClients[0]++;
@@ -2210,6 +2226,29 @@ void CheckExitRules( void ) {
 	if ( level.numPlayingClients < 2 ) {
 		return;
 	}
+
+	/*
+	if (g_powGame.integer == 1 && level.num) {
+		gentity_t *target;
+		if (level.numNonSpectatorClients == 1) {
+			target = &g_entities[level.playersAlive[0]];
+			trap_SendServerCommand(-1, va("print \"%s ^3Wins!\n\"", target->client->pers.netname));
+			SetTeam(target, "spectator");
+		}
+		else if (level.numNonSpectatorClients < 1) {
+			trap_SendServerCommand(-1, va("print \"No One ^3Wins!\n\""));
+		}
+
+		for (i = 0; i < level.maxclients; i++) {
+			if (level.clients[i].pers.connected != CON_DISCONNECTED) {
+				if (level.clients[i].pers.connected == CON_CONNECTED) {
+					if (!(g_entities[i].r.svFlags & SVF_BOT)) {
+						SetTeam(&g_entities[i], "scoreboard");
+					}
+				}
+			}
+		}
+	}*/
 
 	if ( g_gametype.integer < GT_CTF && g_fraglimit.integer ) {
 		if ( level.teamScores[TEAM_RED] >= g_fraglimit.integer ) {

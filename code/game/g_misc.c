@@ -130,6 +130,71 @@ void SP_Pow_Guns(gentity_t *ent) {
 	trap_LinkEntity(ent);
 }
 
+
+//By PowTecH - BR: RNG force spawns
+void SP_Pow_Forces(gentity_t *ent) {
+	int mins[3] = { -2, -2, -2 };
+	int maxs[3] = { 2, 2, 2 };
+	vec3_t dest;
+	trace_t tr;
+	char model[MAX_QPATH] = "";
+
+	//RNG garbage...
+	int rng = 0;
+	int wtf = 0;
+	float i, j;
+	int k;
+
+	i = (int)(crandom() * 1000);
+	j = (int)(crandom() * 1000);
+	k = irand(0, j);
+	wtf = level.time + i * k;
+	Rand_Init(wtf);
+	rng = (irand(0, (level.gunListCount - 1)) - 128);
+
+	ent->s.modelindex = rng;
+	VectorSet(ent->r.mins, mins[0], mins[1], mins[2]);
+	VectorSet(ent->r.maxs, maxs[0], maxs[1], maxs[2]);
+
+	VectorSet(dest, ent->s.origin[0], ent->s.origin[1], ent->s.origin[2] - 4096);
+	trap_Trace(&tr, ent->s.origin, ent->r.mins, ent->r.maxs, dest, ent->s.number, MASK_SOLID);
+	if (tr.startsolid)
+	{
+		G_Printf("SP_misc_shield_floor_unit: misc_shield_floor_unit startsolid at %s\n", vtos(ent->s.origin));
+		G_FreeEntity(ent);
+		return;
+	}
+
+
+	ent->s.eFlags = EF_BOUNCE_HALF;
+
+	ent->s.eType = ET_HOLOCRON;
+	ent->s.pos.trType = TR_GRAVITY;
+	ent->s.pos.trTime = level.time;
+
+	ent->r.contents = CONTENTS_TRIGGER;
+	ent->clipmask = MASK_SOLID;
+
+	ent->physicsObject = qtrue;
+
+	//ent->touch = HolocronTouch;
+	//This makes the model show up somehow
+	/*ent->s.g2radius = 20;
+	ent->s.modelGhoul2 = 1;
+	ent->s.eType = ET_GENERAL;*/
+
+	G_SetOrigin(ent, ent->s.origin);
+	G_SetAngles(ent, ent->s.angles);
+
+	/*ent->nextthink = level.time + FRAMETIME;
+	ent->think = Trigger_Pow_Guns;*/
+
+	trap_LinkEntity(ent);
+
+	//ent->think = HolocronThink;
+	//ent->nextthink = level.time + 50;
+}
+
 /*QUAKED func_group (0 0 0) ?
 Used to group brushes together just for editor convenience.  They are turned into normal brushes by the utilities.
 */

@@ -853,6 +853,12 @@ void Cmd_Team_f( gentity_t *ent ) {
 		//ent->client->sess.losses++;
 	}
 
+	//By PowTecH - BR: dont spawn till everyone is dead
+	if (g_powGame.integer == 1 && level.gameStarted) {
+		trap_SendServerCommand(ent - g_entities, "print \"Round is already started you have to wait\n\"");
+		return;
+	}
+
 	trap_Argv( 1, s, sizeof( s ) );
 
 	SetTeam( ent, s );

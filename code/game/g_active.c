@@ -1837,6 +1837,61 @@ void ClientThink_real( gentity_t *ent ) {
 		level.finishedGame = -1;
 	}
 
+	if (g_powGame.integer == 1) {
+		//By PowTecH - BR: should be time to start the next game
+		if (level.brStartTime <= level.time && !level.gameStarted) {
+			//can only start if we have 2 or more players
+			if (level.numVotingClients >= 2) {
+				G_Printf("^2game starting\n");
+
+				//game started dont start it over
+				level.gameStarted = 1;
+
+				for (i = 0; i < level.numVotingClients; i++) {
+					//find the avilable players
+					target = &g_entities[level.playersAlive[i]];
+					trap_UnlinkEntity(target);
+
+					//spawn them at a ctf spawn i guess
+					spawnPoint = SelectCTFSpawnPoint(TEAM_RED, TEAM_BEGIN, spawn_origin, spawn_angles);
+
+					//gogo
+					if (spawnPoint) {
+						TeleportPlayer(target, spawnPoint->s.origin, spawnPoint->s.angles);
+					}
+					else {
+						G_Printf("^3wtf?\n");
+					}
+				}
+
+				trap_SendServerCommand(-1, va("print \"^2GL HF Idoits\n\""));
+			}
+			else {
+				//not enough players so restart the timer
+				level.brStartTime = level.time + level.queueTime;
+			}
+		}
+
+		//the game that was going on only has 1 person left
+		if (level.numVotingClients <= 1 && level.gameStarted == 1) {
+			G_Printf("^1game ended\n");
+			//game ended
+			level.gameStarted = 0;
+			//restart the time for the next queue
+			level.brStartTime = level.time + level.queueTime;
+
+			for (i = 0; i < level.maxclients; i++) {
+				if (level.clients[i].pers.connected != CON_DISCONNECTED) {
+					if (level.clients[i].pers.connected == CON_CONNECTED) {
+						if (!(g_entities[i].r.svFlags & SVF_BOT)) {
+							SetTeam(&g_entities[i], "x");
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// perform once-a-second actions
 	ClientTimerActions( ent, msec );
 
