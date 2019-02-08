@@ -92,6 +92,13 @@ void SP_Pow_Guns(gentity_t *ent) {
 	float i, j;
 	int k;
 
+	//Game is currently going on so don't try to spawn the item
+	if (level.gameStarted) {
+		ent->think = SP_Pow_Guns;
+		ent->nextthink = level.time + FRAMETIME;
+		return;
+	}
+
 	i = (int)(crandom() * 1000);
 	j = (int)(crandom() * 1000);
 	k = irand(0, j);

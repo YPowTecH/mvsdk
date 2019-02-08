@@ -2347,6 +2347,8 @@ void ClientDisconnect( int clientNum ) {
 			if (level.currentGame[i] == ent->s.number) {
 				level.currentGame[i] = -1;
 				level.currentGameCount--;
+				G_PowNewGame();
+				break;
 			}
 		}
 	}

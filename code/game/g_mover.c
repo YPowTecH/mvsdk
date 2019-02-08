@@ -910,6 +910,15 @@ void Pow_Guns(gentity_t *self, gentity_t *activator) {
 
 	trap_UnlinkEntity(self);
 
+	newEnt = G_Spawn();
+
+	newEnt->s.origin[0] = self->parent->s.origin[0];
+	newEnt->s.origin[1] = self->parent->s.origin[1];
+	newEnt->s.origin[2] = self->parent->s.origin[2];
+	newEnt->s.angles[0] = self->parent->s.angles[0];
+	newEnt->s.angles[1] = self->parent->s.angles[1];
+	newEnt->s.angles[2] = self->parent->s.angles[2];
+
 	// add the weapon
 	activator->client->ps.stats[STAT_WEAPONS] |= (1 << self->parent->item->giTag);
 	//Add_Ammo( other, ent->item->giTag, quantity );
@@ -917,6 +926,9 @@ void Pow_Guns(gentity_t *self, gentity_t *activator) {
 
 	G_FreeEntity(self->parent);
 	G_FreeEntity(self);
+
+	newEnt->think = SP_Pow_Guns;
+	newEnt->nextthink = level.time + FRAMETIME;
 }
 
 void Use_Pow_Guns(gentity_t *self, gentity_t *other, gentity_t *activator) {

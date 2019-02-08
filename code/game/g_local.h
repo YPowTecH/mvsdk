@@ -610,6 +610,7 @@ typedef struct {
 	int			currentGameCount;
 	int			gameStarted;
 	int			brStartTime; //time until queue pop
+	gentity_t	*timer;
 
 	//By PowTecH - Queue
 	int			queueCount; //how many ppl are in queue
@@ -624,7 +625,6 @@ typedef struct {
 	int			finishedGame;//game that just hit the finalscore
 
 } level_locals_t;
-
 
 //
 // g_spawn.c
@@ -851,6 +851,11 @@ void SP_Pow_House(gentity_t *ent);
 
 //By PowTecH - Farming: resource spawn
 void SP_Pow_Resource(gentity_t *ent);
+
+//By PowTecH - BR: RNG weapon spawns
+void SP_Pow_Guns(gentity_t *ent);
+//By PowTecH - BR: RNG force spawns
+void SP_Pow_Forces(gentity_t *ent);
 
 //
 // g_weapon.c

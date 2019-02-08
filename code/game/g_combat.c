@@ -2252,6 +2252,8 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 			if (level.currentGame[i] == self->s.number) {
 				level.currentGame[i] = -1;
 				level.currentGameCount--;
+				G_PowNewGame();
+				break;
 			}
 		}
 		//G_Printf("^1cant leave spec\n");
