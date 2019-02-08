@@ -1067,6 +1067,11 @@ void G_InitGame(int levelTime, int randomSeed, int restart) {
 
 	//By PowTecH - BR: time until start
 	level.brStartTime = level.time + level.queueTime;
+
+	//By PowTecH - BR: init game array
+	for (i = 0; i < MAX_CLIENTS; i++) {
+		level.currentGame[i] = -1;
+	}
 }
 
 

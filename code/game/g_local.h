@@ -606,6 +606,8 @@ typedef struct {
 	int			forceListCount;
 	forceList_t	forceList[MAX_TOKEN_CHARS];
 	int			playersAlive[MAX_CLIENTS];
+	int			currentGame[MAX_CLIENTS];
+	int			currentGameCount;
 	int			gameStarted;
 	int			brStartTime; //time until queue pop
 

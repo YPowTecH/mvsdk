@@ -2248,8 +2248,14 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 	//By PowTecH - BR: dont spawn till next round
 	//need to do this the proper way and leave behind a body and complete the death anim
 	if (g_powGame.integer == 1 && level.gameStarted) {
-		G_Printf("^1cant leave spec\n");
-		SetTeam(self, "spectator");
+		for (i = 0; i < ARRAY_LEN(level.currentGame); i++) {
+			if (level.currentGame[i] == self->s.number) {
+				level.currentGame[i] = -1;
+				level.currentGameCount--;
+			}
+		}
+		//G_Printf("^1cant leave spec\n");
+		//SetTeam(self, "spectator");
 	}
 
 }

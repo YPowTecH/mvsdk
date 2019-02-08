@@ -2341,6 +2341,16 @@ void ClientDisconnect( int clientNum ) {
 		}
 	}
 
+	//By PowTecH - BR: if a player disconnects they are removed from the game
+	if (g_powGame.integer == 1 && level.gameStarted) {
+		for (i = 0; i < ARRAY_LEN(level.currentGame); i++) {
+			if (level.currentGame[i] == ent->s.number) {
+				level.currentGame[i] = -1;
+				level.currentGameCount--;
+			}
+		}
+	}
+
 	trap_UnlinkEntity (ent);
 	ent->s.modelindex = 0;
 	ent->inuse = qfalse;
