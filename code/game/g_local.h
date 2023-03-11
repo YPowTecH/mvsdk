@@ -9,7 +9,7 @@
 //==================================================================
 
 // the "gameversion" client command will print this plus compile date
-#define	GAMEVERSION	"basemv"
+#define	GAMEVERSION	"^7Pro^2@"
 
 #define BODY_QUEUE_SIZE		8
 
@@ -293,6 +293,9 @@ typedef struct {
 // number, but instead follow the first two active players
 #define	FOLLOW_ACTIVE1	-1
 #define	FOLLOW_ACTIVE2	-2
+//
+#define	MAX_VOTE_COUNT	3
+#define MAX_NETNAME		36
 
 // client data that stays across multiple levels or tournament restarts
 // this is achieved by writing all the data to cvar strings at game shutdown
@@ -309,6 +312,15 @@ typedef struct {
 	qboolean	setForce;			// set to true once player is given the chance to set force powers
 	int			updateUITime;		// only update userinfo for FP/SL if < level.time
 	qboolean	teamLeader;			// true when this client is a team leader
+
+	// PowTecH: Account System
+	int			id;
+	char		password[MAX_NETNAME];
+	char		userLogged[MAX_NETNAME];
+	int			thisconnectuc;
+	int			logintrys;
+	// PowTecH: Account System end
+
 } clientSession_t;
 
 // JK2MV
@@ -317,9 +329,6 @@ typedef struct {
 	qboolean	localClient;
 } mvclientSession_t;
 
-//
-#define MAX_NETNAME			36
-#define	MAX_VOTE_COUNT		3
 
 // client data that stays across multiple respawns, but is cleared
 // on each level change or team change at ClientBegin()
@@ -523,6 +532,10 @@ typedef struct {
 
 	// MVSDK
 	qboolean	bboxEncoding;
+
+	// PowTecH: Account System
+	int			dbUserCount;
+	// PowTecH: Account System end
 } level_locals_t;
 
 

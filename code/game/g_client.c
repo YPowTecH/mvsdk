@@ -924,10 +924,12 @@ static void ClientCleanName( const char *in, char *out, int outSize ) {
 			}
 
 			// don't allow black in a name, period
-			if( ColorIndex(*in) == 0 ) {
+			// PowTecH: General
+			/*if (ColorIndex(*in) == 0) {
 				in++;
 				continue;
-			}
+			}*/
+			// PowTecH: General end
 
 			// make sure room in dest for both chars
 			if( len > outSize - 2 ) {
@@ -2334,6 +2336,10 @@ void ClientDisconnect( int clientNum ) {
 			ClientUserinfoChanged( level.sortedClients[1] );
 		}
 	}
+
+	// PowTecH: Account System
+	Cmd_Logout_f(ent);
+	// PowTecH: Account System end
 
 	trap_UnlinkEntity (ent);
 	ent->s.modelindex = 0;

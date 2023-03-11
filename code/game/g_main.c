@@ -325,7 +325,9 @@ static cvarTable_t		gameCvarTable[] = {
 // bk001129 - made static to avoid aliasing
 static int gameCvarTableSize = sizeof( gameCvarTable ) / sizeof( gameCvarTable[0] );
 
-
+// PowTecH: Account System
+char* Twimod_Splitstring(char* stringNew, char split);
+// PowTecH: Account System end
 void G_InitGame					( int levelTime, int randomSeed, int restart );
 void G_RunFrame					( int levelTime );
 void G_ShutdownGame				( int restart );
@@ -707,6 +709,61 @@ void MV_UpdateSvFlags( void )
 	lastValue = intValue;
 }
 
+// PowTecH: Account System
+char* Twimod_Splitstring(char* stringNew, char split) {
+	static char* string = NULL;
+	static char* lastPos = NULL;
+	char* ptr;
+	char* retPtr;
+
+	// If we got a new string as parameter use it, otherwise reuse the previous one...
+	if (stringNew)
+	{
+		string = stringNew;
+		lastPos = string + strlen(string);
+	}
+
+	// If we don't have a string return an empty string
+	if (!string || !strlen(string)) return "";
+
+	//By PowTecH - I want to save my spot and come back to it later
+	if (split == '?') {
+		return string;
+	}
+	else {
+		// Find the split character
+		ptr = strchr(string, split);
+	}
+
+	// If we didn't find one return an empty string
+	if (!ptr) return string;//By PowTecH - why not just return the string?
+
+	// Zero the position of the split character
+	*ptr = 0;
+
+	// Remember the position behind the split character as new starting point
+	retPtr = string;
+	string = ptr + 1;
+
+	// Make sure we don't accidently hop into the next string in memory
+	if (string >= lastPos) string = NULL;
+
+	// Return the result
+	return retPtr;
+}
+
+char* strrep(char* str, char find, char replace) {
+	int i;
+
+	for (i = 0; str[i] != '\0'; i++) {
+		if (str[i] == find) {
+			str[i] = replace;
+		}
+	}
+	return str;
+}
+// PowTecH: Account System end
+
 /*
 ============
 G_InitGame
@@ -893,6 +950,12 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	{
 		G_LogPrintf("Duel Tournament Begun: kill limit %d, win limit: %d\n", g_fraglimit.integer, g_duel_fraglimit.integer );
 	}
+
+	// PowTecH: Account System
+	G_Printf("^2[^7Init Server Settings^2]^7\n");
+	G_Printf("^2-----------------------------------\n");
+	level.dbUserCount = -1;
+	// PowTecH: Account System end
 }
 
 
