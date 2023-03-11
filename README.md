@@ -1,3 +1,12 @@
+# Base - 2023
+Lets see where this goes - expect nothing
+
+Road Map:
+- Account System
+- Currency
+- Unlocks/Property
+- Queued Dueling
+
 # JK2MV - SDK
 https://jk2mv.org
 
