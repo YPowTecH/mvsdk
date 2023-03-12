@@ -11,6 +11,9 @@ Road Map:
 - Unlocks/Property
 - Queued Dueling
 
+# Thanks
+boy, fau, ouned
+
 # JK2MV - SDK
 https://jk2mv.org
 
