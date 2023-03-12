@@ -1125,21 +1125,17 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) 
 Cmd_Say_f
 ==================
 */
-static void Cmd_Say_f( gentity_t *ent, int mode, qboolean arg0 ) {
-	char		*p;
+static void Cmd_Say_f(gentity_t *ent) {
+	const char	*p;
+	int			mode;
 
-	if ( trap_Argc () < 2 && !arg0 ) {
+	if ( trap_Argc () < 2 ) {
 		return;
 	}
 
-	if (arg0)
-	{
-		p = ConcatArgs( 0 );
-	}
-	else
-	{
-		p = ConcatArgs( 1 );
-	}
+	p = ConcatArgs(1);
+
+	mode = SAY_ALL;
 
 	G_Say( ent, NULL, mode, p );
 }
@@ -2191,25 +2187,6 @@ void Cmd_SaberAttackCycle_f(gentity_t *ent)
 	}
 }
 
-qboolean G_OtherPlayersDueling(void)
-{
-	int i = 0;
-	gentity_t *ent;
-
-	while (i < MAX_CLIENTS)
-	{
-		ent = &g_entities[i];
-
-		if (ent && ent->inuse && ent->client && ent->client->ps.duelInProgress)
-		{
-			return qtrue;
-		}
-		i++;
-	}
-
-	return qfalse;
-}
-
 void Cmd_EngageDuel_f(gentity_t *ent)
 {
 	trace_t tr;
@@ -2242,14 +2219,6 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 		return;
 	}
 
-	/*
-	if (!ent->client->ps.saberHolstered)
-	{ //must have saber holstered at the start of the duel
-		return;
-	}
-	*/
-	//NOTE: No longer doing this..
-
 	if (ent->client->ps.saberInFlight)
 	{
 		return;
@@ -2257,19 +2226,6 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 
 	if (ent->client->ps.duelInProgress)
 	{
-		return;
-	}
-
-	//New: Don't let a player duel if he just did and hasn't waited 10 seconds yet (note: If someone challenges him, his duel timer will reset so he can accept)
-	if (ent->client->ps.fd.privateDuelTime > level.time)
-	{
-		trap_SendServerCommand( ent-g_entities, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "CANTDUEL_JUSTDID")) );
-		return;
-	}
-
-	if (G_OtherPlayersDueling())
-	{
-		trap_SendServerCommand( ent-g_entities, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "CANTDUEL_BUSY")) );
 		return;
 	}
 
@@ -2300,7 +2256,7 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 
 		if (challenged->client->ps.duelIndex == ent->s.number && challenged->client->ps.duelTime >= level.time)
 		{
-			trap_SendServerCommand( /*challenged-g_entities*/-1, va("print \"%s" S_COLOR_WHITE " %s %s" S_COLOR_WHITE "!\n\"", challenged->client->pers.netname, G_GetStripEdString("SVINGAME", "PLDUELACCEPT"), ent->client->pers.netname) );
+			trap_SendServerCommand(-1, va("print \"%s" S_COLOR_WHITE " %s %s" S_COLOR_WHITE "!\n\"", challenged->client->pers.netname, G_GetStripEdString("SVINGAME", "PLDUELACCEPT"), ent->client->pers.netname));
 
 			ent->client->ps.duelInProgress = qtrue;
 			challenged->client->ps.duelInProgress = qtrue;
@@ -2308,11 +2264,15 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 			ent->client->ps.duelTime = level.time + 2000;
 			challenged->client->ps.duelTime = level.time + 2000;
 
+			// PowTecH: Dueling
+			ent->client->ps.fd.privateDuelTime = level.time + 2000;
+			challenged->client->ps.fd.privateDuelTime = level.time + 2000;
+			// PowTecH: Dueling end
+
 			G_AddEvent(ent, EV_PRIVATE_DUEL, 1);
 			G_AddEvent(challenged, EV_PRIVATE_DUEL, 1);
 
 			//Holster their sabers now, until the duel starts (then they'll get auto-turned on to look cool)
-
 			if (!ent->client->ps.saberHolstered)
 			{
 				G_Sound(ent, CHAN_AUTO, saberOffSound);
@@ -2325,6 +2285,15 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 				challenged->client->ps.weaponTime = 400;
 				challenged->client->ps.saberHolstered = qtrue;
 			}
+
+			// PowTecH: Dueling
+			ent->client->ps.stats[STAT_ARMOR] =
+				ent->client->ps.stats[STAT_HEALTH] =
+				ent->health = ent->client->ps.stats[STAT_MAX_HEALTH];
+			challenged->client->ps.stats[STAT_ARMOR] =
+				challenged->client->ps.stats[STAT_HEALTH] =
+				challenged->health = challenged->client->ps.stats[STAT_MAX_HEALTH];
+			// PowTecH: Dueling end
 		}
 		else
 		{
@@ -2332,8 +2301,6 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 			G_CenterPrint( challenged-g_entities, 3, va("%s" S_COLOR_WHITE " %s\n", ent->client->pers.netname, G_GetStripEdString("SVINGAME", "PLDUELCHALLENGE")) );
 			G_CenterPrint( ent-g_entities, 3, va("%s %s\n", G_GetStripEdString("SVINGAME", "PLDUELCHALLENGED"), challenged->client->pers.netname) );
 		}
-
-		challenged->client->ps.fd.privateDuelTime = 0; //reset the timer in case this player just got out of a duel. He should still be able to accept the challenge.
 
 		ent->client->ps.forceHandExtend = HANDEXTEND_DUELCHALLENGE;
 		ent->client->ps.forceHandExtendTime = level.time + 1000;
@@ -2433,6 +2400,59 @@ int help_readSys_f(gentity_t* ent) {
 		return -1;
 	}
 }
+
+char* Twimod_Splitstring(char* stringNew, char split) {
+	static char* string = NULL;
+	static char* lastPos = NULL;
+	char* ptr;
+	char* retPtr;
+
+	// If we got a new string as parameter use it, otherwise reuse the previous one...
+	if (stringNew)
+	{
+		string = stringNew;
+		lastPos = string + strlen(string);
+	}
+
+	// If we don't have a string return an empty string
+	if (!string || !strlen(string)) return "";
+
+	//By PowTecH - I want to save my spot and come back to it later
+	if (split == '?') {
+		return string;
+	}
+	else {
+		// Find the split character
+		ptr = strchr(string, split);
+	}
+
+	// If we didn't find one return an empty string
+	if (!ptr) return string;//By PowTecH - why not just return the string?
+
+	// Zero the position of the split character
+	*ptr = 0;
+
+	// Remember the position behind the split character as new starting point
+	retPtr = string;
+	string = ptr + 1;
+
+	// Make sure we don't accidently hop into the next string in memory
+	if (string >= lastPos) string = NULL;
+
+	// Return the result
+	return retPtr;
+}
+
+char* strrep(char* str, char find, char replace) {
+	int i;
+
+	for (i = 0; str[i] != '\0'; i++) {
+		if (str[i] == find) {
+			str[i] = replace;
+		}
+	}
+	return str;
+}
 // - Helpers end
 
 void Cmd_Register_f(gentity_t* ent) {
@@ -2511,7 +2531,7 @@ void Cmd_Register_f(gentity_t* ent) {
 	//create a new user incrimented by one
 	Com_sprintf(userfile, sizeof(userfile), "users/%i.cfg", level.dbUserCount);
 	trap_FS_FOpenFile(userfile, &f, FS_APPEND);
-	Com_sprintf(userwrite, sizeof(userwrite), "%s %s %s 500 0 0 0 0 0 0 0 0 ", username, password1);
+	Com_sprintf(userwrite, sizeof(userwrite), "%s %s ", username, password1);
 	trap_FS_Write(userwrite, strlen(userwrite), f);
 	trap_FS_FCloseFile(f);
 	trap_SendServerCommand(ent - g_entities, va("print \"^2[^7User '^2%s^7' with the password '^2%s^7' successfully created^2]^7\n\"", username, password1));
@@ -2639,7 +2659,6 @@ static void Cmd_Login_f(gentity_t* ent) {
 static void Cmd_Logout_f(gentity_t* ent) {
 	int i, len;
 	char userfile[MAX_TOKEN_CHARS];
-	char userwrite[MAX_TOKEN_CHARS];
 	char buffer[MAX_TOKEN_CHARS];
 	qboolean found = qfalse;
 
@@ -2690,23 +2709,7 @@ static void Cmd_Logout_f(gentity_t* ent) {
 // PowTecH: Account System - commands end
 
 #ifdef _DEBUG
-void PM_SetAnim(int setAnimParts,int anim,int setAnimFlags, int blendTime);
-
-void StandardSetBodyAnim(gentity_t *self, int anim, int flags)
-{
-	pmove_t pmv;
-
-	memset (&pmv, 0, sizeof(pmv));
-	pmv.ps = &self->client->ps;
-	pmv.animations = bgGlobalAnimations;
-	pmv.cmd = self->client->pers.cmd;
-	pmv.trace = trap_Trace;
-	pmv.pointcontents = trap_PointContents;
-	pmv.gametype = g_gametype.integer;
-
-	pm = &pmv;
-	PM_SetAnim(SETANIM_BOTH, anim, flags, 0);
-}
+void PM_SetAnim(int setAnimParts, int anim, int setAnimFlags, int blendTime);
 
 void DismembermentTest(gentity_t *self);
 

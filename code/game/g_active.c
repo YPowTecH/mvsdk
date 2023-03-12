@@ -989,6 +989,15 @@ void G_UpdateClientBroadcasts ( gentity_t *self )
 	G_UpdateForceSightBroadcasts ( self );
 }
 
+// PowTecH: Dueling
+static void G_FinishDuel(gentity_t* ent)
+{
+	ent->client->ps.duelInProgress = qfalse;
+	ent->client->ps.fd.privateDuelTime = 0;
+	G_AddEvent(ent, EV_PRIVATE_DUEL, 0);
+}
+// PowTecH: Dueling end
+
 /*
 ==============
 ClientThink
@@ -1110,30 +1119,25 @@ void ClientThink_real( gentity_t *ent ) {
 	client->ps.speed = g_speed.value;
 	client->ps.basespeed = g_speed.value;
 
+	// PowTecH: Dueling
 	if (ent->client->ps.duelInProgress)
 	{
 		gentity_t *duelAgainst = &g_entities[ent->client->ps.duelIndex];
 
-		//Keep the time updated, so once this duel ends this player can't engage in a duel for another
-		//10 seconds. This will give other people a chance to engage in duels in case this player wants
-		//to engage again right after he's done fighting and someone else is waiting.
-		ent->client->ps.fd.privateDuelTime = level.time + 10000;
+		switch (ucmd->generic_cmd)
+		{
+		case GENCMD_USE_SEEKER:
+		case GENCMD_USE_FIELD:
+		case GENCMD_USE_BACTA:
+		case GENCMD_USE_SENTRY:
+			ucmd->generic_cmd = 0;
+		}
 
 		if (ent->client->ps.duelTime < level.time)
 		{
-			//Bring out the sabers
 			if (ent->client->ps.weapon == WP_SABER && ent->client->ps.saberHolstered &&
 				ent->client->ps.duelTime)
 			{
-				if (!saberOffSound || !saberOnSound)
-				{
-					saberOffSound = G_SoundIndex("sound/weapons/saber/saberoffquick.wav");
-					saberOnSound = G_SoundIndex("sound/weapons/saber/saberon.wav");
-				}
-
-				ent->client->ps.saberHolstered = qfalse;
-				G_Sound(ent, CHAN_AUTO, saberOnSound);
-
 				G_AddEvent(ent, EV_PRIVATE_DUEL, 2);
 
 				ent->client->ps.duelTime = 0;
@@ -1143,15 +1147,6 @@ void ClientThink_real( gentity_t *ent ) {
 				duelAgainst->client->ps.weapon == WP_SABER && duelAgainst->client->ps.saberHolstered &&
 				duelAgainst->client->ps.duelTime)
 			{
-				if (!saberOffSound || !saberOnSound)
-				{
-					saberOffSound = G_SoundIndex("sound/weapons/saber/saberoffquick.wav");
-					saberOnSound = G_SoundIndex("sound/weapons/saber/saberon.wav");
-				}
-
-				duelAgainst->client->ps.saberHolstered = qfalse;
-				G_Sound(duelAgainst, CHAN_AUTO, saberOnSound);
-
 				G_AddEvent(duelAgainst, EV_PRIVATE_DUEL, 2);
 
 				duelAgainst->client->ps.duelTime = 0;
@@ -1169,46 +1164,70 @@ void ClientThink_real( gentity_t *ent ) {
 		if (!duelAgainst || !duelAgainst->client || !duelAgainst->inuse ||
 			duelAgainst->client->ps.duelIndex != ent->s.number)
 		{
-			ent->client->ps.duelInProgress = 0;
-			G_AddEvent(ent, EV_PRIVATE_DUEL, 0);
+			G_FinishDuel(ent);
 		}
 		else if (duelAgainst->health < 1 || duelAgainst->client->ps.stats[STAT_HEALTH] < 1)
 		{
-			ent->client->ps.duelInProgress = 0;
-			duelAgainst->client->ps.duelInProgress = 0;
+			if (ent->health > 0 && ent->client->ps.stats[STAT_HEALTH] > 0)
+			{
+				int duelTime = (level.time - ent->client->ps.fd.privateDuelTime) / 1000;
+				int minutes = duelTime / 60;
+				int seconds = duelTime % 60;
+				char* time;
+				int totalHealth = ent->client->ps.stats[STAT_HEALTH] + ent->client->ps.stats[STAT_ARMOR];
+				int totalHealthColor;
 
-			G_AddEvent(ent, EV_PRIVATE_DUEL, 0);
-			G_AddEvent(duelAgainst, EV_PRIVATE_DUEL, 0);
+				if (minutes <= 0 && seconds == 1)
+				{
+					time = va(S_COLOR_CYAN "%02i" S_COLOR_WHITE " second", seconds);
+				}
+				else if (minutes <= 0)
+				{
+					time = va(S_COLOR_CYAN "%02i" S_COLOR_WHITE " seconds", seconds);
+				}
+				else if (minutes > 0 && seconds <= 0)
+				{
+					if (minutes == 1)
+					{
+						time = va(S_COLOR_CYAN "%02i" S_COLOR_WHITE " minute", minutes);
+					}
+					else
+					{
+						time = va(S_COLOR_CYAN "%02i" S_COLOR_WHITE " minutes", minutes);
+					}
+				}
+				else
+				{
+					time = va(S_COLOR_CYAN "%02i" S_COLOR_WHITE ":" S_COLOR_CYAN "%02i", minutes, seconds);
+				}
+
+				if (totalHealth >= 100)
+				{
+					totalHealthColor = 2;
+				}
+				else if (totalHealth >= 50)
+				{
+					totalHealthColor = 3;
+				}
+				else
+				{
+					totalHealthColor = 1;
+				}
+
+				trap_SendServerCommand(-1, va("print \"^2[^7NF Duel^2] %s ^7defeated %s ^7in %s ^7with ^%d%d ^7health left\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname, time, totalHealthColor, totalHealth));
+			}
+			else 
+			{
+				trap_SendServerCommand(-1, va("print \"%s ^7& %s ^7died\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname));
+			}
 
 			//Winner gets full health.. providing he's still alive
-			if (ent->health > 0 && ent->client->ps.stats[STAT_HEALTH] > 0)
-			{
-				if (ent->health < ent->client->ps.stats[STAT_MAX_HEALTH])
-				{
-					ent->client->ps.stats[STAT_HEALTH] = ent->health = ent->client->ps.stats[STAT_MAX_HEALTH];
-				}
+			ent->client->ps.stats[STAT_HEALTH] = ent->health = ent->client->ps.stats[STAT_MAX_HEALTH];
 
-				if (g_spawnInvulnerability.integer)
-				{
-					ent->client->ps.eFlags |= EF_INVULNERABLE;
-					ent->client->invulnerableTimer = level.time + g_spawnInvulnerability.integer;
-				}
-			}
+			G_FinishDuel(ent);
+			G_FinishDuel(duelAgainst);
 
-			/*
-			trap_SendServerCommand( ent-g_entities, va("print \"%s" S_COLOR_WHITE " %s\n\"", ent->client->pers.netname, G_GetStripEdString("SVINGAME", "PLDUELWINNER")) );
-			trap_SendServerCommand( duelAgainst-g_entities, va("print \"%s" S_COLOR_WHITE " %s\n\"", ent->client->pers.netname, G_GetStripEdString("SVINGAME", "PLDUELWINNER")) );
-			*/
-			//Private duel announcements are now made globally because we only want one duel at a time.
-			if (ent->health > 0 && ent->client->ps.stats[STAT_HEALTH] > 0)
-			{
-				G_CenterPrint( -1, 3, va("%s" S_COLOR_WHITE " %s %s" S_COLOR_WHITE "!\n", ent->client->pers.netname, G_GetStripEdString("SVINGAME", "PLDUELWINNER"), duelAgainst->client->pers.netname) );
-			}
-			else
-			{ //it was a draw, because we both managed to die in the same frame
-				G_CenterPrint( -1, 3, va("%s\n", G_GetStripEdString("SVINGAME", "PLDUELTIE")) );
-			}
-		}
+		}// PowTecH: Dueling end
 		else
 		{
 			vec3_t vSub;
