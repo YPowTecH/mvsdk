@@ -2,7 +2,11 @@
 Lets see where this goes - expect nothing
 
 Road Map:
-- Account System
+- Account System [March 12, 2023]
+- Dueling
+	- Phase 1 [March 12, 2023] 
+		- Give duel results some stats
+		- Remove bad basejk rules around dueling
 - Currency
 - Unlocks/Property
 - Queued Dueling
