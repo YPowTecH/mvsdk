@@ -164,6 +164,9 @@ void SP_path_corner (gentity_t *self);
 
 void SP_misc_teleporter_dest (gentity_t *self);
 void SP_misc_model(gentity_t *ent);
+// PowTecH: Mapping
+void SP_misc_model_breakable(gentity_t* ent);
+// PowTecH: Mapping end
 void SP_misc_G2model(gentity_t *ent);
 void SP_misc_portal_camera(gentity_t *ent);
 void SP_misc_portal_surface(gentity_t *ent);
@@ -258,6 +261,9 @@ spawn_t	spawns[] = {
 
 	{"misc_teleporter_dest", SP_misc_teleporter_dest},
 	{"misc_model", SP_misc_model},
+	// PowTecH: Mapping
+	{"misc_model_breakable", SP_misc_model_breakable},
+	// PowTecH: Mapping end
 	{"misc_G2model", SP_misc_G2model},
 	{"misc_portal_surface", SP_misc_portal_surface},
 	{"misc_portal_camera", SP_misc_portal_camera},

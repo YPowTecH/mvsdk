@@ -197,8 +197,10 @@ void SP_target_speaker( gentity_t *ent ) {
 	G_SpawnFloat( "random", "0", &ent->random );
 
 	if ( !G_SpawnString( "noise", "NOSOUND", &s ) ) {
+		// PowTecH: Mapping
 		G_FreeEntity(ent);
 		return;
+		// PowTecH: Mapping end
 	}
 
 	// force all client reletive sounds to be "activator" speakers that

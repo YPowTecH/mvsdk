@@ -146,6 +146,48 @@ void SP_misc_model( gentity_t *ent ) {
 #endif
 }
 
+// PowTecH: Mapping
+void SP_misc_model_breakable(gentity_t* ent) {
+	int mins[3] = { 0, 0, 0 };
+	int maxs[3] = { 0, 0, 0 };
+	char* value;
+
+	ent->s.modelindex = G_ModelIndex(ent->model);
+
+	G_SpawnString("mins", "", &value);
+	sscanf(value, "%i %i %i", &mins[0], &mins[1], &mins[2]);
+
+	G_SpawnString("maxs", "", &value);
+	sscanf(value, "%i %i %i", &maxs[0], &maxs[1], &maxs[2]);
+
+	VectorSet(ent->r.mins, mins[0], mins[1], mins[2]);
+	VectorSet(ent->r.maxs, maxs[0], maxs[1], maxs[2]);
+
+	if (strstr(ent->model, ".glm"))
+	{
+		ent->classname = "Twimod G2Model";
+		ent->s.g2radius = 100;
+		ent->s.modelGhoul2 = 1;
+
+		// PowTecH: Comment - can do this for all models but be careful some models just have huge boxes
+		// - Example: x-wing
+		ent->r.contents = CONTENTS_SOLID;
+		ent->clipmask = MASK_SOLID;
+
+		if (ent->spawnflags & 2) ent->s.eType = ET_GRAPPLE;
+	}
+	else
+	{
+		ent->classname = "Twimod Model";
+	}
+	if (ent->spawnflags & 1) ent->s.shouldtarget = qtrue;
+
+	trap_LinkEntity(ent);
+
+	G_SetOrigin(ent, ent->s.origin);
+	G_SetAngles(ent, ent->s.angles);
+}
+// PowTecH: Mapping end
 
 /*QUAKED misc_G2model (1 0 0) (-16 -16 -16) (16 16 16)
 "model"		arbitrary .glm file to display
