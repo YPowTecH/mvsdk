@@ -328,6 +328,11 @@ void SP_info_jedimaster_start(gentity_t *ent)
 	ent->nextthink = level.time + 50;
 }
 
+void SP_info_player_duel(gentity_t* ent) {
+	ent->classname = "info_player_duel";
+	SP_info_player_deathmatch(ent);
+}
+
 /*
 =======================================================================
 

@@ -536,6 +536,10 @@ typedef struct {
 	// PowTecH: Account System
 	int			dbUserCount;
 	// PowTecH: Account System end
+	// PowTecH: Duel Queue
+	gentity_t* queue[MAX_CLIENTS];
+	// PowTecH: Duel Queue end
+
 } level_locals_t;
 
 
@@ -562,6 +566,11 @@ void Cmd_SaberAttackCycle_f(gentity_t *ent);
 int G_ItemUsable(playerState_t *ps, int forcedUse);
 void Cmd_ToggleSaber_f(gentity_t *ent);
 void Cmd_EngageDuel_f(gentity_t *ent);
+
+// PowTecH: Duel Queue
+void Cmd_JoinQueue_f(gentity_t* ent);
+qboolean G_LeaveQueue(gentity_t* ent);
+// PowTecH: Duel Queue end
 
 gentity_t *G_GetDuelWinner(gclient_t *client);
 

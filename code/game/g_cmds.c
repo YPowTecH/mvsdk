@@ -4,6 +4,10 @@
 
 #include "../ui/menudef.h"			// for the voice chats
 
+#define CMD_NOINTERMISSION	0x01
+#define CMD_CHEAT			0x02
+#define CMD_ALIVE			0x04
+
 //rww - for getting bot commands...
 int AcceptBotCommand(char *cmd, gentity_t *pl);
 //end rww
@@ -1119,15 +1123,116 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) 
 	}
 }
 
+// PowTecH: Duel Queue
+static void Cmd_Queue_f(gentity_t* ent) {
+	int i;
+	int playersInQueue = 0;
+
+	for (i = 0; i < ARRAY_LEN(level.queue); i++) {
+		if (level.queue[i] == NULL) {
+			break;
+		}
+
+		playersInQueue++;
+		trap_SendServerCommand(ent - g_entities, va("print \"^2[^7%i^2]^7 - %s\n\"", i, level.queue[i]->client->pers.netname));
+	}
+
+	if (playersInQueue == 0)
+	{
+		trap_SendServerCommand(ent - g_entities, Pow_Output("No one in Queue", 2));
+	}
+}
+
+void Cmd_JoinQueue_f(gentity_t* ent) {
+	int i;
+
+	for (i = 0; i < ARRAY_LEN(level.queue); i++) {
+		if (level.queue[i] == ent) {
+			trap_SendServerCommand(ent - g_entities, Pow_Output("You are already in queue", 1));
+			return;
+		}
+
+		if (level.queue[i] == NULL) {
+			level.queue[i] = ent;
+			trap_SendServerCommand(ent - g_entities, Pow_Output("You joined the queue", 2));
+			return;
+		}
+	}
+}
+
+qboolean G_LeaveQueue(gentity_t* ent) {
+	int i, j;
+	qboolean found = qfalse;
+
+	//look for the player
+	for (i = 0; i < ARRAY_LEN(level.queue); i++) {
+		//found him
+		if (level.queue[i] == ent) {
+			level.queue[i] = NULL;
+
+			found = qtrue;
+			break;
+		}
+	}
+
+	if ((i + 1) < MAX_CLIENTS && level.queue[(i + 1)] != NULL) {
+		for (j = i; j < MAX_CLIENTS; j++) {
+			//if we are at the end of the array
+			if ((j + 1) == MAX_CLIENTS) {
+				level.queue[j] = NULL;
+			}
+
+			//move everyone up in the queue
+			level.queue[j] = level.queue[(j + 1)];
+
+			//we found the end of the queue
+			if (level.queue[(j + 1)] == NULL) {
+				break;
+			}
+		}
+	}
+
+	return found;
+}
+
+static void Cmd_LeaveQueue_f(gentity_t* ent) {
+	if (G_LeaveQueue(ent)) {
+		//found you
+		trap_SendServerCommand(ent - g_entities, Pow_Output("You left queue", 2));
+	}
+	else {
+		//not in queue
+		trap_SendServerCommand(ent - g_entities, Pow_Output("You were not in queue", 1));
+	}
+	return;
+}
+// PowTecH: Duel Queue end
+
+typedef struct {
+	const char* name;				// must be lower-case for comparing
+	void		(*function)(gentity_t*);
+	int			flags;				// allow during intermission
+} clientCommand_t;
+
+static const clientCommand_t chatCommands[] = {
+	// PowTecH: Duel Queue
+	{ ".q",  Cmd_Queue_f, 0 },
+	{ ".r", Cmd_JoinQueue_f, CMD_ALIVE | CMD_NOINTERMISSION },
+	{ ".l", Cmd_LeaveQueue_f, 0 }
+	// PowTecH: Duel Queue end
+};
 
 /*
 ==================
 Cmd_Say_f
 ==================
 */
+// PowTecH: General
 static void Cmd_Say_f(gentity_t *ent) {
+	const clientCommand_t* command = NULL;
 	const char	*p;
-	int			mode;
+	int mode;
+	int i;
 
 	if ( trap_Argc () < 2 ) {
 		return;
@@ -1137,8 +1242,42 @@ static void Cmd_Say_f(gentity_t *ent) {
 
 	mode = SAY_ALL;
 
-	G_Say( ent, NULL, mode, p );
+	for (i = 0; i < ARRAY_LEN(chatCommands); i++) {
+		if (!strcmp(p, chatCommands[i].name)) {
+			command = &chatCommands[i];
+			break;
+		}
+	}
+
+	if (command == NULL) {
+		G_Say(ent, NULL, mode, p);
+		return;
+	}
+
+	if (command->flags & CMD_CHEAT) {
+		if (!g_cheats.integer) {
+			trap_SendServerCommand(ent - g_entities, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "NOCHEATS")));
+			return;
+		}
+	}
+
+	if (command->flags & CMD_NOINTERMISSION) {
+		if (level.intermissiontime || level.intermissionQueued) {
+			trap_SendServerCommand(ent - g_entities, va("print \"You cannot perform this task (%s) during the intermission.\n\"", p));
+			return;
+		}
+	}
+
+	if (command->flags & CMD_ALIVE) {
+		if (ent->health <= 0 || ent->client->sess.spectatorState != SPECTATOR_NOT) {
+			trap_SendServerCommand(ent - g_entities, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "MUSTBEALIVE")));
+			return;
+		}
+	}
+
+	command->function(ent);
 }
+// PowTecH: General End
 
 /*
 ==================
@@ -2341,7 +2480,7 @@ static void Cmd_AddBot_f(gentity_t* ent)
 	trap_SendServerCommand(ent - g_entities, va("print \"%s.\n\"", G_GetStripEdString("SVINGAME", "ONLY_ADD_BOTS_AS_SERVER")));
 }
 
-// PowTecH: Account System - commands
+// PowTecH: Account System
 // - Helpers
 void help_write_f(gentity_t* ent, char* userfile) {
 	char userwrite[MAX_TOKEN_CHARS];
@@ -2706,7 +2845,7 @@ static void Cmd_Logout_f(gentity_t* ent) {
 	//Q_strncpyz(ent->client->sess.emoteBit, "", sizeof(ent->client->sess.emoteBit));
 	trap_SendServerCommand(ent - g_entities, Pow_Output("You are now logged out", 2));
 }
-// PowTecH: Account System - commands end
+// PowTecH: Account System end
 
 #ifdef _DEBUG
 void PM_SetAnim(int setAnimParts, int anim, int setAnimFlags, int blendTime);
@@ -2948,17 +3087,7 @@ static void Cmd_DropWeapon_f(gentity_t* ent)
 }
 #endif // _DEBUG
 
-#define CMD_NOINTERMISSION	0x01
-#define CMD_CHEAT			0x02
-#define CMD_ALIVE			0x04
-
-typedef struct {
-	const char* name;				// must be lower-case for comparing
-	void		(*function)(gentity_t*);
-	int			flags;				// allow during intermission
-} clientCommand_t;
-
-static const clientCommand_t commands[] = {
+static const clientCommand_t consoleCommands[] = {
 	{ "say", Cmd_Say_f, 0 },
 	{ "tell", Cmd_Tell_f, 0 },
 	{ "score", Cmd_Score_f, 0 },
@@ -2981,11 +3110,11 @@ static const clientCommand_t commands[] = {
 	{ "levelshot", Cmd_LevelShot_f, CMD_CHEAT | CMD_ALIVE | CMD_NOINTERMISSION },
 	{ "thedestroyer", Cmd_TheDestroyer_f, CMD_CHEAT | CMD_ALIVE | CMD_NOINTERMISSION },
 	{ "addbot", Cmd_AddBot_f, 0 },
-	// PowTecH: Account System - commands
+	// PowTecH: Account System
 	{ "amregister", Cmd_Register_f, CMD_NOINTERMISSION },
 	{ "amlogin", Cmd_Login_f, CMD_NOINTERMISSION },
 	{ "amlogout", Cmd_Logout_f, CMD_NOINTERMISSION },
-	// PowTecH: Account System - commands end
+	// PowTecH: Account System end
 #ifdef _DEBUG
 	{ "dropweapon", Cmd_DropWeapon_f, CMD_ALIVE | CMD_CHEAT },
 	{ "headexplodey", Cmd_HeadExplodey_f, CMD_CHEAT },
@@ -3041,9 +3170,9 @@ void ClientCommand(int clientNum) {
 	//end rww
 
 	// PowTecH: General
-	for (i = 0; i < ARRAY_LEN(commands); i++) {
-		if (!strcmp(cmd, commands[i].name)) {
-			command = &commands[i];
+	for (i = 0; i < ARRAY_LEN(consoleCommands); i++) {
+		if (!strcmp(cmd, consoleCommands[i].name)) {
+			command = &consoleCommands[i];
 			break;
 		}
 	}

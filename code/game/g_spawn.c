@@ -115,10 +115,9 @@ void SP_info_player_imperial (gentity_t *ent);
 void SP_info_player_rebel (gentity_t *ent);
 void SP_info_player_intermission (gentity_t *ent);
 void SP_info_jedimaster_start (gentity_t *ent);
-void SP_info_firstplace(gentity_t *ent);
-void SP_info_secondplace(gentity_t *ent);
-void SP_info_thirdplace(gentity_t *ent);
-void SP_info_podium(gentity_t *ent);
+// PowTecH: Duel Queue
+void SP_info_player_duel(gentity_t* ent);
+// PowTecH: Duel Queue end
 
 void SP_info_saga_objective (gentity_t *ent);
 
@@ -147,7 +146,6 @@ void SP_target_delay (gentity_t *ent);
 void SP_target_speaker (gentity_t *ent);
 void SP_target_print (gentity_t *ent);
 void SP_target_laser (gentity_t *self);
-void SP_target_character (gentity_t *ent);
 void SP_target_score( gentity_t *ent );
 void SP_target_teleporter( gentity_t *ent );
 void SP_target_relay (gentity_t *ent);
@@ -164,9 +162,6 @@ void SP_path_corner (gentity_t *self);
 
 void SP_misc_teleporter_dest (gentity_t *self);
 void SP_misc_model(gentity_t *ent);
-// PowTecH: Mapping
-void SP_misc_model_breakable(gentity_t* ent);
-// PowTecH: Mapping end
 void SP_misc_G2model(gentity_t *ent);
 void SP_misc_portal_camera(gentity_t *ent);
 void SP_misc_portal_surface(gentity_t *ent);
@@ -209,6 +204,9 @@ spawn_t	spawns[] = {
 	{"info_player_rebel", SP_info_player_rebel},
 	{"info_player_intermission", SP_info_player_intermission},
 	{"info_jedimaster_start", SP_info_jedimaster_start},
+	// PowTecH: Duel Queue
+	{"info_player_duel", SP_info_player_duel},
+	// PowTecH: Duel Queue end
 	{"info_null", SP_info_null},
 	{"info_notnull", SP_info_notnull},		// use target_position instead
 	{"info_camp", SP_info_camp},
@@ -261,9 +259,6 @@ spawn_t	spawns[] = {
 
 	{"misc_teleporter_dest", SP_misc_teleporter_dest},
 	{"misc_model", SP_misc_model},
-	// PowTecH: Mapping
-	{"misc_model_breakable", SP_misc_model_breakable},
-	// PowTecH: Mapping end
 	{"misc_G2model", SP_misc_G2model},
 	{"misc_portal_surface", SP_misc_portal_surface},
 	{"misc_portal_camera", SP_misc_portal_camera},

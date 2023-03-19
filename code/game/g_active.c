@@ -998,6 +998,41 @@ static void G_FinishDuel(gentity_t* ent)
 }
 // PowTecH: Dueling end
 
+// PowTecH: Duel Queue
+#define	MAX_SPAWN_POINTS	128
+
+static gentity_t* G_SelectSpawnForDuel() {
+	gentity_t*	spot = NULL;
+	int			count = 0;
+	int			selection;
+	gentity_t*	spots[MAX_SPAWN_POINTS];
+
+	while ((spot = G_Find(spot, FOFS(classname), "info_player_duel")) != NULL) {
+		if (SpotWouldTelefrag(spot)) {
+			continue;
+		}
+		spots[count] = spot;
+		count++;
+	}
+
+	// no spots that won't telefrag
+	if (!count) {
+		return G_Find(NULL, FOFS(classname), "info_player_duel");
+	}
+
+	selection = rand() % count;
+	return spots[selection];
+}
+
+static void G_SpawnAtDuel(gentity_t* ent) {
+	gentity_t* spot;
+
+	spot = G_SelectSpawnForDuel();
+
+	TeleportPlayer(ent, spot->s.origin, spot->s.angles);
+}
+// PowTecH: Duel Queue end
+
 /*
 ==============
 ClientThink
@@ -1227,6 +1262,11 @@ void ClientThink_real( gentity_t *ent ) {
 			G_FinishDuel(ent);
 			G_FinishDuel(duelAgainst);
 
+			// PowTecH: Duel Queue
+			Cmd_JoinQueue_f(ent);
+			Cmd_JoinQueue_f(duelAgainst);
+			// PowTecH: Duel Queue end
+
 		}// PowTecH: Dueling end
 		else
 		{
@@ -1248,6 +1288,47 @@ void ClientThink_real( gentity_t *ent ) {
 			}
 		}
 	}
+
+	// PowTecH: Duel Queue
+	if (level.queue[0] && 
+		level.queue[0] == ent && 
+		ent->client->ps.pm_type != PM_DEAD &&
+		level.queue[1] && 
+		level.queue[1]->client->ps.pm_type != PM_DEAD
+	) {
+		gentity_t* duelAgainst = level.queue[1];
+		int breakTime;
+
+		if (((level.time / 1000) % 13) == 0) {
+			G_SpawnAtDuel(ent);
+			G_SpawnAtDuel(duelAgainst);
+
+			if (!ent->client->ps.saberHolstered) {
+				G_Sound(ent, CHAN_AUTO, saberOffSound);
+				ent->client->ps.weaponTime = 400;
+				ent->client->ps.saberHolstered = qtrue;
+			}
+
+			if (!duelAgainst->client->ps.saberHolstered) {
+				G_Sound(duelAgainst, CHAN_AUTO, saberOffSound);
+				duelAgainst->client->ps.weaponTime = 400;
+				duelAgainst->client->ps.saberHolstered = qtrue;
+			}
+
+			ent->client->ps.duelInProgress = 0;
+			duelAgainst->client->ps.duelInProgress = 0;
+
+			G_AddEvent(ent, EV_PRIVATE_DUEL, 0);
+			G_AddEvent(duelAgainst, EV_PRIVATE_DUEL, 0);
+
+			Cmd_EngageDuel_f(ent);
+			Cmd_EngageDuel_f(duelAgainst);
+
+			G_LeaveQueue(ent);
+			G_LeaveQueue(duelAgainst);
+		}
+	}
+	// PowTecH: Duel Queue end
 
 	/*
 	if ( client->ps.powerups[PW_HASTE] ) {

@@ -893,11 +893,18 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 		G_LogPrintf("Duel Tournament Begun: kill limit %d, win limit: %d\n", g_fraglimit.integer, g_duel_fraglimit.integer );
 	}
 
-	// PowTecH: Account System
+	// PowTecH: General
 	G_Printf("^2[^7Init Server Settings^2]^7\n");
 	G_Printf("^2-----------------------------------\n");
+	// PowTecH: General end
+	// PowTecH: Account System
 	level.dbUserCount = -1;
 	// PowTecH: Account System end
+	// PowTecH: Duel Queue
+	for (i = 0; i < MAX_CLIENTS; i++) {
+		level.queue[i] = NULL;
+	}
+	// PowTecH: Duel Queue end
 }
 
 
