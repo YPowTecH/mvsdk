@@ -320,6 +320,9 @@ typedef struct {
 	int			thisconnectuc;
 	int			logintrys;
 	// PowTecH: Account System end
+	// PowTecH: Duel Queue
+	qboolean	inQueue;
+	// PowTecH: Duel Queue end
 
 } clientSession_t;
 
@@ -537,11 +540,17 @@ typedef struct {
 	int			dbUserCount;
 	// PowTecH: Account System end
 	// PowTecH: Duel Queue
-	gentity_t* queue[MAX_CLIENTS];
+	gentity_t*	queue[MAX_CLIENTS];
 	// PowTecH: Duel Queue end
 
 } level_locals_t;
 
+// PowTecH: Duel Queue
+typedef struct {
+	qboolean	found;
+	int			index;
+} queueSearch_t;
+// PowTecH: Duel Queue end
 
 //
 // g_spawn.c
@@ -568,7 +577,9 @@ void Cmd_ToggleSaber_f(gentity_t *ent);
 void Cmd_EngageDuel_f(gentity_t *ent);
 
 // PowTecH: Duel Queue
-void Cmd_JoinQueue_f(gentity_t* ent);
+int G_CountQueue();
+queueSearch_t G_InQueue(gentity_t* ent);
+qboolean G_JoinQueue(gentity_t* ent);
 qboolean G_LeaveQueue(gentity_t* ent);
 // PowTecH: Duel Queue end
 

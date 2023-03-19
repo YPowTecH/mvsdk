@@ -1124,6 +1124,44 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) 
 }
 
 // PowTecH: Duel Queue
+int G_CountQueue() {
+	int i;
+	int j = 0;
+
+	for (i = 0; i < ARRAY_LEN(level.queue); i++) {
+		if (!level.queue[i]) {
+			break;
+		}
+
+		j++;
+	}
+
+	return j;
+}
+
+queueSearch_t G_InQueue(gentity_t* ent) {
+	int i;
+	queueSearch_t search;
+
+	for (i = 0; i < ARRAY_LEN(level.queue); i++) {
+		if (level.queue[i] == ent) {
+			search.found = qtrue;
+			search.index = i;
+			return search;
+		}
+
+		if (level.queue[i] == NULL) {
+			search.found = qfalse;
+			search.index = i;
+			return search;
+		}
+	}
+
+	search.found = qfalse;
+	search.index = -1;
+	return search;
+}
+
 static void Cmd_Queue_f(gentity_t* ent) {
 	int i;
 	int playersInQueue = 0;
@@ -1134,7 +1172,7 @@ static void Cmd_Queue_f(gentity_t* ent) {
 		}
 
 		playersInQueue++;
-		trap_SendServerCommand(ent - g_entities, va("print \"^2[^7%i^2]^7 - %s\n\"", i, level.queue[i]->client->pers.netname));
+		trap_SendServerCommand(ent - g_entities, va("print \"^2[^7%i^2]^7 - %s\n\"", (i + 1), level.queue[i]->client->pers.netname));
 	}
 
 	if (playersInQueue == 0)
@@ -1143,68 +1181,86 @@ static void Cmd_Queue_f(gentity_t* ent) {
 	}
 }
 
-void Cmd_JoinQueue_f(gentity_t* ent) {
-	int i;
+qboolean G_JoinQueue(gentity_t* ent) {
+	queueSearch_t search = G_InQueue(ent);
 
-	for (i = 0; i < ARRAY_LEN(level.queue); i++) {
-		if (level.queue[i] == ent) {
-			trap_SendServerCommand(ent - g_entities, Pow_Output("You are already in queue", 1));
-			return;
-		}
+	if (search.index == -1) {
+		trap_SendServerCommand(ent - g_entities, Pow_Output("The queue is full", 1));
+		return qfalse;
+	}
 
-		if (level.queue[i] == NULL) {
-			level.queue[i] = ent;
-			trap_SendServerCommand(ent - g_entities, Pow_Output("You joined the queue", 2));
-			return;
-		}
+	if (search.found) {
+		return qfalse;
+	}
+
+	level.queue[search.index] = ent;
+
+	return qtrue;
+}
+
+static void Cmd_JoinQueue_f(gentity_t* ent) {
+	if (G_JoinQueue(ent)) {
+		ent->client->sess.inQueue = qtrue;
+		trap_SendServerCommand(ent - g_entities, Pow_Output("You joined the queue", 2));
+	}
+	else {
+		ent->client->sess.inQueue = qfalse;
+		trap_SendServerCommand(ent - g_entities, Pow_Output("You are already in queue", 1));
 	}
 }
 
 qboolean G_LeaveQueue(gentity_t* ent) {
-	int i, j;
+	int i, j, k;
 	qboolean found = qfalse;
+	queueSearch_t search = G_InQueue(ent);
 
-	//look for the player
-	for (i = 0; i < ARRAY_LEN(level.queue); i++) {
-		//found him
-		if (level.queue[i] == ent) {
-			level.queue[i] = NULL;
-
-			found = qtrue;
-			break;
-		}
+	if (search.index == -1) {
+		return qfalse;
 	}
 
-	if ((i + 1) < MAX_CLIENTS && level.queue[(i + 1)] != NULL) {
-		for (j = i; j < MAX_CLIENTS; j++) {
-			//if we are at the end of the array
-			if ((j + 1) == MAX_CLIENTS) {
+	if (search.found) {
+		level.queue[search.index] = NULL;
+
+		// last index in array was changed - its already null so no more work required
+		if (search.index + 1 == MAX_CLIENTS) {
+			return qtrue;
+		}
+
+		for (j = search.index; j < MAX_CLIENTS; j++) {
+			k = j + 1;
+
+			// at the last index - cant get [32] so just make [31] null
+			if (k == MAX_CLIENTS) {
 				level.queue[j] = NULL;
-			}
-
-			//move everyone up in the queue
-			level.queue[j] = level.queue[(j + 1)];
-
-			//we found the end of the queue
-			if (level.queue[(j + 1)] == NULL) {
 				break;
 			}
+
+			// [..., null, null, ... null] - reached the end of the populated part of the array
+			if (level.queue[j] == NULL && level.queue[k] == NULL) {
+				break;
+			}
+
+			// move [30]'s data into [29]
+			level.queue[j] = level.queue[k];
 		}
+
+		return qtrue;
 	}
 
-	return found;
+	return qfalse;
 }
 
 static void Cmd_LeaveQueue_f(gentity_t* ent) {
 	if (G_LeaveQueue(ent)) {
 		//found you
+		ent->client->sess.inQueue = qfalse;
 		trap_SendServerCommand(ent - g_entities, Pow_Output("You left queue", 2));
 	}
 	else {
 		//not in queue
+		ent->client->sess.inQueue = qfalse;
 		trap_SendServerCommand(ent - g_entities, Pow_Output("You were not in queue", 1));
 	}
-	return;
 }
 // PowTecH: Duel Queue end
 
@@ -1217,7 +1273,7 @@ typedef struct {
 static const clientCommand_t chatCommands[] = {
 	// PowTecH: Duel Queue
 	{ ".q",  Cmd_Queue_f, 0 },
-	{ ".r", Cmd_JoinQueue_f, CMD_ALIVE | CMD_NOINTERMISSION },
+	{ ".j", Cmd_JoinQueue_f, CMD_ALIVE | CMD_NOINTERMISSION },
 	{ ".l", Cmd_LeaveQueue_f, 0 }
 	// PowTecH: Duel Queue end
 };

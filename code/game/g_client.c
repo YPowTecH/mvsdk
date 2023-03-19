@@ -347,20 +347,20 @@ SpotWouldTelefrag
 
 ================
 */
-qboolean SpotWouldTelefrag( gentity_t *spot ) {
+qboolean SpotWouldTelefrag(gentity_t* spot) {
 	int			i, num;
 	int			touch[MAX_GENTITIES];
-	gentity_t	*hit;
+	gentity_t*	hit;
 	vec3_t		mins, maxs;
 
-	VectorAdd( spot->s.origin, playerMins, mins );
-	VectorAdd( spot->s.origin, playerMaxs, maxs );
-	num = trap_EntitiesInBox( mins, maxs, touch, MAX_GENTITIES );
+	VectorAdd(spot->s.origin, playerMins, mins);
+	VectorAdd(spot->s.origin, playerMaxs, maxs);
+	num = trap_EntitiesInBox(mins, maxs, touch, MAX_GENTITIES);
 
-	for (i=0 ; i<num ; i++) {
+	for (i = 0; i < num; i++) {
 		hit = &g_entities[touch[i]];
 		//if ( hit->client && hit->client->ps.stats[STAT_HEALTH] > 0 ) {
-		if ( hit->client) {
+		if (hit->client) {
 			return qtrue;
 		}
 
@@ -1804,6 +1804,11 @@ void ClientSpawn(gentity_t *ent) {
 	if ( client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		spawnPoint = SelectSpectatorSpawnPoint ( 
 						spawn_origin, spawn_angles);
+
+		// PowTecH: Duel Queue
+		G_LeaveQueue(ent);
+		ent->client->sess.inQueue = qfalse;
+		// PowTecH: Duel Queue end
 	} else if (g_gametype.integer == GT_CTF || g_gametype.integer == GT_CTY) {
 		// all base oriented team games use the CTF spawn points
 		spawnPoint = SelectCTFSpawnPoint ( 
@@ -2345,6 +2350,10 @@ void ClientDisconnect( int clientNum ) {
 	// PowTecH: Account System
 	Cmd_Logout_f(ent);
 	// PowTecH: Account System end
+	// PowTecH: Duel Queue
+	G_LeaveQueue(ent);
+	ent->client->sess.inQueue = qfalse;
+	// PowTecH: Duel Queue end
 
 	trap_UnlinkEntity (ent);
 	ent->s.modelindex = 0;

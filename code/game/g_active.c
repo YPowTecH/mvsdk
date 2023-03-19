@@ -1001,6 +1001,33 @@ static void G_FinishDuel(gentity_t* ent)
 // PowTecH: Duel Queue
 #define	MAX_SPAWN_POINTS	128
 
+static qboolean G_ArenaInUse(gentity_t* spot) {
+	int			i, num;
+	int			touch[MAX_GENTITIES];
+	gentity_t*	hit;
+	vec3_t		mins, maxs;
+	vec3_t	playerMins = { -500, -500, -24 };
+	vec3_t	playerMaxs = { 500, 500, 40 };
+
+	VectorAdd(spot->s.origin, playerMins, mins);
+	VectorAdd(spot->s.origin, playerMaxs, maxs);
+	num = trap_EntitiesInBox(mins, maxs, touch, MAX_GENTITIES);
+
+	for (i = 0; i < num; i++) {
+		hit = &g_entities[touch[i]];
+
+		if (hit->client && 
+			hit->client->ps.pm_type != PM_DEAD && 
+			hit->client->sess.inQueue &&
+			!G_InQueue(hit).found
+		) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
 static gentity_t* G_SelectSpawnForDuel() {
 	gentity_t*	spot = NULL;
 	int			count = 0;
@@ -1008,6 +1035,10 @@ static gentity_t* G_SelectSpawnForDuel() {
 	gentity_t*	spots[MAX_SPAWN_POINTS];
 
 	while ((spot = G_Find(spot, FOFS(classname), "info_player_duel")) != NULL) {
+		if (G_ArenaInUse(spot)) {
+			continue;
+		}
+
 		if (SpotWouldTelefrag(spot)) {
 			continue;
 		}
@@ -1015,21 +1046,73 @@ static gentity_t* G_SelectSpawnForDuel() {
 		count++;
 	}
 
-	// no spots that won't telefrag
 	if (!count) {
-		return G_Find(NULL, FOFS(classname), "info_player_duel");
+		return NULL;
 	}
 
 	selection = rand() % count;
 	return spots[selection];
 }
 
-static void G_SpawnAtDuel(gentity_t* ent) {
+static qboolean G_SpawnAtDuel(gentity_t* ent, gentity_t* duelAgainst) {
 	gentity_t* spot;
+	vec3_t otherAngles = { 0, 0, 0 };
+	vec3_t otherOrigin;
 
 	spot = G_SelectSpawnForDuel();
 
+	if (!spot) {
+		return qfalse;
+	}
+
+	VectorCopy(spot->s.origin, otherOrigin);
+
 	TeleportPlayer(ent, spot->s.origin, spot->s.angles);
+
+	if (spot->s.angles[YAW] == 90) {
+		otherAngles[YAW] = otherAngles[YAW] - 90;
+		otherOrigin[1] = otherOrigin[1] + 256;
+	}
+	else {
+		otherAngles[YAW] = otherAngles[YAW] + 180;
+		otherOrigin[0] = otherOrigin[0] + 256;
+	}
+
+	TeleportPlayer(duelAgainst, otherOrigin, otherAngles);
+
+	return qtrue;
+}
+
+static void G_StartDuel(gentity_t* ent, gentity_t* duelAgainst) {
+	if (duelAgainst &&
+		duelAgainst->client &&
+		duelAgainst->client->ps.pm_type != PM_DEAD && 
+		G_SpawnAtDuel(ent, duelAgainst)
+	) {
+		if (!ent->client->ps.saberHolstered) {
+			G_Sound(ent, CHAN_AUTO, saberOffSound);
+			ent->client->ps.weaponTime = 400;
+			ent->client->ps.saberHolstered = qtrue;
+		}
+
+		if (!duelAgainst->client->ps.saberHolstered) {
+			G_Sound(duelAgainst, CHAN_AUTO, saberOffSound);
+			duelAgainst->client->ps.weaponTime = 400;
+			duelAgainst->client->ps.saberHolstered = qtrue;
+		}
+
+		ent->client->ps.duelInProgress = 0;
+		duelAgainst->client->ps.duelInProgress = 0;
+
+		G_AddEvent(ent, EV_PRIVATE_DUEL, 0);
+		G_AddEvent(duelAgainst, EV_PRIVATE_DUEL, 0);
+
+		Cmd_EngageDuel_f(ent);
+		Cmd_EngageDuel_f(duelAgainst);
+
+		G_LeaveQueue(ent);
+		G_LeaveQueue(duelAgainst);
+	}
 }
 // PowTecH: Duel Queue end
 
@@ -1263,8 +1346,17 @@ void ClientThink_real( gentity_t *ent ) {
 			G_FinishDuel(duelAgainst);
 
 			// PowTecH: Duel Queue
-			Cmd_JoinQueue_f(ent);
-			Cmd_JoinQueue_f(duelAgainst);
+			if (ent->client->sess.inQueue) {
+				if (G_JoinQueue(ent)) {
+					trap_SendServerCommand(ent - g_entities, Pow_Output("You joined the queue", 2));
+				}
+			}
+
+			if (duelAgainst->client->sess.inQueue) {
+				if (G_JoinQueue(duelAgainst)) {
+					trap_SendServerCommand(duelAgainst - g_entities, Pow_Output("You joined the queue", 2));
+				}
+			}
 			// PowTecH: Duel Queue end
 
 		}// PowTecH: Dueling end
@@ -1284,50 +1376,69 @@ void ClientThink_real( gentity_t *ent ) {
 				G_AddEvent(ent, EV_PRIVATE_DUEL, 0);
 				G_AddEvent(duelAgainst, EV_PRIVATE_DUEL, 0);
 
+				// PowTecH: Duel Queue
+				if (ent->client->sess.inQueue) {
+					ent->client->sess.inQueue = qfalse;
+				}
+
+				if (duelAgainst->client->sess.inQueue) {
+					duelAgainst->client->sess.inQueue = qfalse;
+				}
+				// PowTecH: Duel Queue end
+
 				trap_SendServerCommand( -1, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "PLDUELSTOP")) );
 			}
 		}
 	}
 
-	// PowTecH: Duel Queue
-	if (level.queue[0] && 
-		level.queue[0] == ent && 
+	if (level.queue[0] &&
+		level.queue[0] == ent &&
 		ent->client->ps.pm_type != PM_DEAD &&
-		level.queue[1] && 
-		level.queue[1]->client->ps.pm_type != PM_DEAD
+		level.queue[1]
 	) {
-		gentity_t* duelAgainst = level.queue[1];
-		int breakTime;
-
 		if (((level.time / 1000) % 13) == 0) {
-			G_SpawnAtDuel(ent);
-			G_SpawnAtDuel(duelAgainst);
+			const int countQueue = G_CountQueue();
+			const int duelAgainstIndex = rand() % countQueue;
 
-			if (!ent->client->ps.saberHolstered) {
-				G_Sound(ent, CHAN_AUTO, saberOffSound);
-				ent->client->ps.weaponTime = 400;
-				ent->client->ps.saberHolstered = qtrue;
+			if (countQueue == 2) {
+				G_StartDuel(ent, level.queue[1]);
 			}
+			else {
+				for (i = (duelAgainstIndex + 1); i < ARRAY_LEN(level.queue); i++) {
+					if (i == duelAgainstIndex) {
+						break;
+					}
 
-			if (!duelAgainst->client->ps.saberHolstered) {
-				G_Sound(duelAgainst, CHAN_AUTO, saberOffSound);
-				duelAgainst->client->ps.weaponTime = 400;
-				duelAgainst->client->ps.saberHolstered = qtrue;
+					if (level.queue[i] == NULL) {
+						i = 1;
+						continue;
+					}
+
+					if (level.queue[i] == ent) {
+						continue;
+					}
+
+					G_StartDuel(ent, level.queue[i]);
+
+					break;
+				}
 			}
-
-			ent->client->ps.duelInProgress = 0;
-			duelAgainst->client->ps.duelInProgress = 0;
-
-			G_AddEvent(ent, EV_PRIVATE_DUEL, 0);
-			G_AddEvent(duelAgainst, EV_PRIVATE_DUEL, 0);
-
-			Cmd_EngageDuel_f(ent);
-			Cmd_EngageDuel_f(duelAgainst);
-
-			G_LeaveQueue(ent);
-			G_LeaveQueue(duelAgainst);
 		}
 	}
+
+
+	// PowTecH: Duel Queue
+	//if (level.queue[0] && 
+	//	level.queue[0] == ent && 
+	//	ent->client->ps.pm_type != PM_DEAD &&
+	//	level.queue[1] && 
+	//	level.queue[1]->client->ps.pm_type != PM_DEAD
+	//) {
+	//	if (((level.time / 1000) % 13) == 0) {
+
+	//		
+	//	}
+	//}
 	// PowTecH: Duel Queue end
 
 	/*
