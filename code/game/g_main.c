@@ -907,8 +907,6 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	// PowTecH: Duel Queue end
 }
 
-
-
 /*
 =================
 G_ShutdownGame

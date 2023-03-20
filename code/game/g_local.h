@@ -322,6 +322,8 @@ typedef struct {
 	// PowTecH: Account System end
 	// PowTecH: Duel Queue
 	qboolean	inQueue;
+	qboolean	retryQueue;
+	qboolean	rejoinQueueWhenAlive;
 	// PowTecH: Duel Queue end
 
 } clientSession_t;

@@ -1001,6 +1001,85 @@ static void G_FinishDuel(gentity_t* ent)
 // PowTecH: Duel Queue
 #define	MAX_SPAWN_POINTS	128
 
+static void G_EngageDuel(gentity_t* ent, gentity_t* duelAgainst) {
+	ent->client->ps.duelIndex = duelAgainst->s.number;
+	duelAgainst->client->ps.duelIndex = ent->s.number;
+
+	ent->client->ps.duelInProgress = qtrue;
+	duelAgainst->client->ps.duelInProgress = qtrue;
+
+	ent->client->ps.duelTime = level.time + 2000;
+	duelAgainst->client->ps.duelTime = level.time + 2000;
+
+	ent->client->ps.fd.privateDuelTime = level.time + 2000;
+	duelAgainst->client->ps.fd.privateDuelTime = level.time + 2000;
+
+	G_AddEvent(ent, EV_PRIVATE_DUEL, 1);
+	G_AddEvent(duelAgainst, EV_PRIVATE_DUEL, 1);
+
+	ent->client->ps.stats[STAT_ARMOR] =
+		ent->client->ps.stats[STAT_HEALTH] =
+		ent->health = ent->client->ps.stats[STAT_MAX_HEALTH];
+	duelAgainst->client->ps.stats[STAT_ARMOR] =
+		duelAgainst->client->ps.stats[STAT_HEALTH] =
+		duelAgainst->health = duelAgainst->client->ps.stats[STAT_MAX_HEALTH];
+
+	G_LeaveQueue(ent);
+	G_LeaveQueue(duelAgainst);
+}
+
+static void G_GoToArena(gentity_t* ent, vec3_t origin, vec3_t angles) {
+	gentity_t* tent;
+
+	// Follow spectators don't need to teleport. And calling BG_PlayerStateToEntityState on them corrupts their s.number
+	if (ent->client->sess.spectatorState == SPECTATOR_FOLLOW) { 
+		return;
+	}
+
+	// use temp events at source and destination to prevent the effect
+	// from getting dropped by a second player event
+	if (ent->client->sess.sessionTeam != TEAM_SPECTATOR) {
+		tent = G_TempEntity(ent->client->ps.origin, EV_PLAYER_TELEPORT_OUT);
+		tent->s.clientNum = ent->s.clientNum;
+
+		tent = G_TempEntity(origin, EV_PLAYER_TELEPORT_IN);
+		tent->s.clientNum = ent->s.clientNum;
+	}
+
+	// unlink to make sure it can't possibly interfere with G_KillBox
+	trap_UnlinkEntity(ent);
+
+	VectorCopy(origin, ent->client->ps.origin);
+	ent->client->ps.origin[2] += 1;
+
+	// spit the player out
+	AngleVectors(angles, ent->client->ps.velocity, NULL, NULL);
+	VectorScale(ent->client->ps.velocity, 1, ent->client->ps.velocity);
+	ent->client->ps.pm_time = 160;		// hold time
+	ent->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
+
+	// toggle the teleport bit so the client knows to not lerp
+	ent->client->ps.eFlags ^= EF_TELEPORT_BIT;
+
+	// set angles
+	SetClientViewAngle(ent, angles);
+
+	// kill anything at the destination
+	if (ent->client->sess.sessionTeam != TEAM_SPECTATOR) {
+		G_KillBox(ent);
+	}
+
+	// save results of pmove
+	BG_PlayerStateToEntityState(&ent->client->ps, &ent->s, qtrue);
+
+	// use the precise origin for linking
+	VectorCopy(ent->client->ps.origin, ent->r.currentOrigin);
+
+	if (ent->client->sess.sessionTeam != TEAM_SPECTATOR) {
+		trap_LinkEntity(ent);
+	}
+}
+
 static qboolean G_ArenaInUse(gentity_t* spot) {
 	int			i, num;
 	int			touch[MAX_GENTITIES];
@@ -1019,8 +1098,8 @@ static qboolean G_ArenaInUse(gentity_t* spot) {
 		if (hit->client && 
 			hit->client->ps.pm_type != PM_DEAD && 
 			hit->client->sess.inQueue &&
-			!G_InQueue(hit).found
-		) {
+			!G_InQueue(hit).found) 
+		{
 			return qtrue;
 		}
 	}
@@ -1067,7 +1146,7 @@ static qboolean G_SpawnAtDuel(gentity_t* ent, gentity_t* duelAgainst) {
 
 	VectorCopy(spot->s.origin, otherOrigin);
 
-	TeleportPlayer(ent, spot->s.origin, spot->s.angles);
+	G_GoToArena(ent, spot->s.origin, spot->s.angles);
 
 	if (spot->s.angles[YAW] == 90) {
 		otherAngles[YAW] = otherAngles[YAW] - 90;
@@ -1078,17 +1157,40 @@ static qboolean G_SpawnAtDuel(gentity_t* ent, gentity_t* duelAgainst) {
 		otherOrigin[0] = otherOrigin[0] + 256;
 	}
 
-	TeleportPlayer(duelAgainst, otherOrigin, otherAngles);
+	G_GoToArena(duelAgainst, otherOrigin, otherAngles);
 
 	return qtrue;
 }
 
-static void G_StartDuel(gentity_t* ent, gentity_t* duelAgainst) {
-	if (duelAgainst &&
-		duelAgainst->client &&
-		duelAgainst->client->ps.pm_type != PM_DEAD && 
-		G_SpawnAtDuel(ent, duelAgainst)
-	) {
+static qboolean G_SetupDuel(gentity_t* ent, gentity_t* duelAgainst) {
+	if (ent->client->ps.pm_type == PM_DEAD ||
+		ent->client->ps.duelTime >= level.time ||
+		ent->client->ps.weapon != WP_SABER ||
+		ent->client->ps.duelInProgress ||
+		ent->client->ps.saberInFlight)
+	{
+		duelAgainst->client->sess.retryQueue = qtrue;
+
+		G_LeaveQueue(ent);
+		ent->client->sess.inQueue = qfalse;
+		trap_SendServerCommand(ent - g_entities, Pow_Output("You have been removed from queue", 1));
+		return qfalse;
+	}
+
+	if (duelAgainst->client->ps.pm_type == PM_DEAD ||
+		duelAgainst->client->ps.weapon != WP_SABER ||
+		duelAgainst->client->ps.duelInProgress ||
+		duelAgainst->client->ps.saberInFlight)
+	{
+		ent->client->sess.retryQueue = qtrue;
+
+		G_LeaveQueue(duelAgainst);
+		duelAgainst->client->sess.inQueue = qfalse;
+		trap_SendServerCommand(duelAgainst - g_entities, Pow_Output("You have been removed from queue", 1));
+		return qfalse;
+	}
+
+	if (G_SpawnAtDuel(ent, duelAgainst)) {
 		if (!ent->client->ps.saberHolstered) {
 			G_Sound(ent, CHAN_AUTO, saberOffSound);
 			ent->client->ps.weaponTime = 400;
@@ -1107,12 +1209,12 @@ static void G_StartDuel(gentity_t* ent, gentity_t* duelAgainst) {
 		G_AddEvent(ent, EV_PRIVATE_DUEL, 0);
 		G_AddEvent(duelAgainst, EV_PRIVATE_DUEL, 0);
 
-		Cmd_EngageDuel_f(ent);
-		Cmd_EngageDuel_f(duelAgainst);
+		G_EngageDuel(ent, duelAgainst);
 
-		G_LeaveQueue(ent);
-		G_LeaveQueue(duelAgainst);
+		return qtrue;
 	}
+
+	return qfalse;
 }
 // PowTecH: Duel Queue end
 
@@ -1332,7 +1434,14 @@ void ClientThink_real( gentity_t *ent ) {
 					totalHealthColor = 1;
 				}
 
-				trap_SendServerCommand(-1, va("print \"^2[^7NF Duel^2] %s ^7defeated %s ^7in %s ^7with ^%d%d ^7health left\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname, time, totalHealthColor, totalHealth));
+				// PowTecH: Duel Queue
+				if (ent->client->sess.inQueue && duelAgainst->client->sess.inQueue) {
+					trap_SendServerCommand(-1, va("print \"^2[^7NF Duel^2] %s ^7defeated %s ^7in %s ^7with ^%d%d ^7health left\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname, time, totalHealthColor, totalHealth));
+				}
+				else {
+					trap_SendServerCommand(-1, va("print \"^2[^7Private NF Duel^2] %s ^7defeated %s ^7in %s ^7with ^%d%d ^7health left\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname, time, totalHealthColor, totalHealth));
+				}
+				// PowTecH: Duel Queue end
 			}
 			else 
 			{
@@ -1353,9 +1462,7 @@ void ClientThink_real( gentity_t *ent ) {
 			}
 
 			if (duelAgainst->client->sess.inQueue) {
-				if (G_JoinQueue(duelAgainst)) {
-					trap_SendServerCommand(duelAgainst - g_entities, Pow_Output("You joined the queue", 2));
-				}
+				duelAgainst->client->sess.rejoinQueueWhenAlive = qtrue;
 			}
 			// PowTecH: Duel Queue end
 
@@ -1391,19 +1498,25 @@ void ClientThink_real( gentity_t *ent ) {
 		}
 	}
 
-	if (level.queue[0] &&
-		level.queue[0] == ent &&
-		ent->client->ps.pm_type != PM_DEAD &&
-		level.queue[1]
-	) {
-		if (((level.time / 1000) % 13) == 0) {
+	if (ent->client->sess.inQueue && 
+		level.queue[0] == ent && 
+		level.queue[1]) 
+	{
+		if (((level.time / 1000) % 13) == 0 || 
+			ent->client->sess.retryQueue || 
+			level.queue[1]->client->sess.retryQueue) 
+		{
 			const int countQueue = G_CountQueue();
-			const int duelAgainstIndex = rand() % countQueue;
+
+			ent->client->sess.retryQueue = qfalse;
+			level.queue[1]->client->sess.retryQueue = qfalse;
 
 			if (countQueue == 2) {
-				G_StartDuel(ent, level.queue[1]);
+				G_SetupDuel(ent, level.queue[1]);
 			}
 			else {
+				const int duelAgainstIndex = rand() % countQueue;
+
 				for (i = (duelAgainstIndex + 1); i < ARRAY_LEN(level.queue); i++) {
 					if (i == duelAgainstIndex) {
 						break;
@@ -1418,7 +1531,7 @@ void ClientThink_real( gentity_t *ent ) {
 						continue;
 					}
 
-					G_StartDuel(ent, level.queue[i]);
+					G_SetupDuel(ent, level.queue[i]);
 
 					break;
 				}

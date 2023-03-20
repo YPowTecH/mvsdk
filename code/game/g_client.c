@@ -1713,6 +1713,12 @@ void ClientBegin( int clientNum, qboolean allowTeamReset ) {
 	CalculateRanks();
 
 	G_ClearClientLog(clientNum);
+
+	// PowTecH: Duel Queue
+	ent->client->sess.inQueue = qfalse;
+	ent->client->sess.retryQueue = qfalse;
+	ent->client->sess.rejoinQueueWhenAlive = qfalse;
+	// PowTecH: Duel Queue end
 }
 
 static qboolean AllForceDisabled(int force)
@@ -2257,6 +2263,16 @@ void ClientSpawn(gentity_t *ent) {
 
 	// clear entity state values
 	BG_PlayerStateToEntityState( &client->ps, &ent->s, qtrue );
+
+	// PowTecH: Duel Queue
+	if (ent->client->sess.inQueue && 
+		ent->client->sess.rejoinQueueWhenAlive) 
+	{
+		if (G_JoinQueue(ent)) {
+			trap_SendServerCommand(ent - g_entities, Pow_Output("You joined the queue", 2));
+		}
+	}
+	// PowTecH: Duel Queue end
 }
 
 

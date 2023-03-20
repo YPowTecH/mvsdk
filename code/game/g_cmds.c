@@ -1199,6 +1199,13 @@ qboolean G_JoinQueue(gentity_t* ent) {
 }
 
 static void Cmd_JoinQueue_f(gentity_t* ent) {
+	if (g_gametype.integer == GT_TOURNAMENT ||
+		g_gametype.integer >= GT_TEAM) 
+	{
+		ent->client->sess.inQueue = qfalse;
+		trap_SendServerCommand(ent - g_entities, Pow_Output("Queue has been disabled", 1));
+	}
+
 	if (G_JoinQueue(ent)) {
 		ent->client->sess.inQueue = qtrue;
 		trap_SendServerCommand(ent - g_entities, Pow_Output("You joined the queue", 2));
@@ -1272,7 +1279,7 @@ typedef struct {
 
 static const clientCommand_t chatCommands[] = {
 	// PowTecH: Duel Queue
-	{ ".q",  Cmd_Queue_f, 0 },
+	{ ".q", Cmd_Queue_f, 0 },
 	{ ".j", Cmd_JoinQueue_f, CMD_ALIVE | CMD_NOINTERMISSION },
 	{ ".l", Cmd_LeaveQueue_f, 0 }
 	// PowTecH: Duel Queue end
@@ -2451,7 +2458,9 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 
 		if (challenged->client->ps.duelIndex == ent->s.number && challenged->client->ps.duelTime >= level.time)
 		{
-			trap_SendServerCommand(-1, va("print \"%s" S_COLOR_WHITE " %s %s" S_COLOR_WHITE "!\n\"", challenged->client->pers.netname, G_GetStripEdString("SVINGAME", "PLDUELACCEPT"), ent->client->pers.netname));
+			// PowTecH: Duel Queue
+			trap_SendServerCommand(-1, va("print \"^2[^7Private NF Duel^2]^7 %s ^7vs %s^7\n\"", ent->client->pers.netname, challenged->client->pers.netname));
+			// PowTecH: Duel Queue end
 
 			ent->client->ps.duelInProgress = qtrue;
 			challenged->client->ps.duelInProgress = qtrue;
@@ -2489,6 +2498,20 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 				challenged->client->ps.stats[STAT_HEALTH] =
 				challenged->health = challenged->client->ps.stats[STAT_MAX_HEALTH];
 			// PowTecH: Dueling end
+
+			// PowTecH: Duel Queue
+			if (ent->client->sess.inQueue) {
+				G_LeaveQueue(ent);
+				ent->client->sess.inQueue = qfalse;
+				trap_SendServerCommand(ent - g_entities, Pow_Output("You have been removed from queue", 1));
+			}
+
+			if (challenged->client->sess.inQueue) {
+				G_LeaveQueue(challenged);
+				challenged->client->sess.inQueue = qfalse;
+				trap_SendServerCommand(challenged - g_entities, Pow_Output("You have been removed from queue", 1));
+			}
+			// PowTecH: Duel Queue end
 		}
 		else
 		{
