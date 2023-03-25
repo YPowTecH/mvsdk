@@ -788,7 +788,7 @@ void SetTeam( gentity_t *ent, char *s ) {
 	ClientUserinfoChanged( clientNum );
 	
 	memset( ent->client->ps.powerups, 0, sizeof(ent->client->ps.powerups) ); // Ensure following spectators don't take flags or such into ClientBegin and trigger the FlagEatingFix (this allows us to check for powerups in the playerState to prevent flagEating when calling ClientBegin)
-	ClientBegin( clientNum, qfalse );
+	ClientBegin(clientNum, qfalse, qfalse);
 }
 
 /*
@@ -2559,6 +2559,29 @@ static void Cmd_AddBot_f(gentity_t* ent)
 	trap_SendServerCommand(ent - g_entities, va("print \"%s.\n\"", G_GetStripEdString("SVINGAME", "ONLY_ADD_BOTS_AS_SERVER")));
 }
 
+// PowTecH: General
+#define WELCOME_MESSAGE 500
+
+void Cmd_Info_f(gentity_t* ent) {
+	char welcomeMessage[WELCOME_MESSAGE];
+
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "\n^7Pro^2@\n");
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "^7Welcome to the first and only Match Making duel server\n\n");
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "^2[^7Queue^2]\n");
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "\t^7Type in chat:\n");
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "\t^2.j^7 - Join the queue\n");
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "\t^2.l^7 - Leave the queue\n");
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "\t^2.q^7 - Show the queue\n\n");
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "^2[^7Account^2]\n");
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "\t^7Type in console:\n");
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "\t^2/register <username> <password> <password>\n");
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "\t^2/login <username> <password>\n");
+	Q_strcat(welcomeMessage, WELCOME_MESSAGE, "\t^2/logout\n\n");
+	trap_SendServerCommand(ent - g_entities, va("print \"%s\"", welcomeMessage));
+	memset(welcomeMessage, 0, WELCOME_MESSAGE);
+}
+// PowTecH: General end
+
 // PowTecH: Account System
 // - Helpers
 void help_write_f(gentity_t* ent, char* userfile) {
@@ -2688,7 +2711,7 @@ void Cmd_Register_f(gentity_t* ent) {
 
 	// Check we got a username and two passwords
 	if (!(strlen(username) && strlen(password1) && strlen(password2))) {
-		trap_SendServerCommand(ent - g_entities, va("print \"^1/^7amregister ^1<^7username^1> <^7password^1> <^7password^1>^7\n\""));
+		trap_SendServerCommand(ent - g_entities, va("print \"^1/^7register ^1<^7username^1> <^7password^1> <^7password^1>^7\n\""));
 		return;
 	}
 
@@ -2795,7 +2818,7 @@ static void Cmd_Login_f(gentity_t* ent) {
 
 	// Check we got a username and a password
 	if (!(strlen(username) && strlen(pass))) {
-		trap_SendServerCommand(ent - g_entities, va("print \"^1/^7amlogin ^1<^7username^1> <^7password^1>^7\n\""));
+		trap_SendServerCommand(ent - g_entities, va("print \"^1/^7login ^1<^7username^1> <^7password^1>^7\n\""));
 		return;
 	}
 
@@ -3189,10 +3212,14 @@ static const clientCommand_t consoleCommands[] = {
 	{ "levelshot", Cmd_LevelShot_f, CMD_CHEAT | CMD_ALIVE | CMD_NOINTERMISSION },
 	{ "thedestroyer", Cmd_TheDestroyer_f, CMD_CHEAT | CMD_ALIVE | CMD_NOINTERMISSION },
 	{ "addbot", Cmd_AddBot_f, 0 },
+	// PowTecH: General
+	{ "info", Cmd_Info_f, 0 },
+	{ "help", Cmd_Info_f, 0 },
+	// PowTecH: General end
 	// PowTecH: Account System
-	{ "amregister", Cmd_Register_f, CMD_NOINTERMISSION },
-	{ "amlogin", Cmd_Login_f, CMD_NOINTERMISSION },
-	{ "amlogout", Cmd_Logout_f, CMD_NOINTERMISSION },
+	{ "register", Cmd_Register_f, CMD_NOINTERMISSION },
+	{ "login", Cmd_Login_f, CMD_NOINTERMISSION },
+	{ "logout", Cmd_Logout_f, CMD_NOINTERMISSION },
 	// PowTecH: Account System end
 #ifdef _DEBUG
 	{ "dropweapon", Cmd_DropWeapon_f, CMD_ALIVE | CMD_CHEAT },

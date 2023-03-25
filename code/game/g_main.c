@@ -399,7 +399,7 @@ int requestedMvApi = 0;
 		ClientDisconnect( arg0 );
 		return 0;
 	case GAME_CLIENT_BEGIN:
-		ClientBegin( arg0, qtrue );
+		ClientBegin(arg0, arg1, qtrue);
 		return 0;
 	case GAME_CLIENT_COMMAND:
 		ClientCommand( arg0 );

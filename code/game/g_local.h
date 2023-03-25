@@ -538,6 +538,10 @@ typedef struct {
 	// MVSDK
 	qboolean	bboxEncoding;
 
+	// PowTecH: General
+	int			lastAdTime;
+	int			lastAdIndex;
+	// PowTecH: General end
 	// PowTecH: Account System
 	int			dbUserCount;
 	// PowTecH: Account System end
@@ -578,6 +582,9 @@ int G_ItemUsable(playerState_t *ps, int forcedUse);
 void Cmd_ToggleSaber_f(gentity_t *ent);
 void Cmd_EngageDuel_f(gentity_t *ent);
 
+// PowTecH: General
+void Cmd_Info_f(gentity_t* ent);
+// PowTecH: General end
 // PowTecH: Duel Queue
 int G_CountQueue();
 queueSearch_t G_InQueue(gentity_t* ent);
@@ -875,7 +882,7 @@ void MV_BBoxToTime2( gentity_t *ent );
 char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot );
 void ClientUserinfoChanged( int clientNum );
 void ClientDisconnect( int clientNum );
-void ClientBegin( int clientNum, qboolean allowTeamReset );
+void ClientBegin(int clientNum, qboolean firstTime, qboolean allowTeamReset);
 void ClientCommand( int clientNum );
 
 //

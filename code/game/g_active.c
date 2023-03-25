@@ -681,7 +681,7 @@ Actions that happen once a second
 */
 void ClientTimerActions( gentity_t *ent, int msec ) {
 	gclient_t	*client;
-
+	
 	client = ent->client;
 	client->timeResidual += msec;
 
@@ -698,6 +698,25 @@ void ClientTimerActions( gentity_t *ent, int msec ) {
 		if ( client->ps.stats[STAT_ARMOR] > client->ps.stats[STAT_MAX_HEALTH] ) {
 			client->ps.stats[STAT_ARMOR]--;
 		}
+
+		// PowTecH: General
+		if (level.lastAdTime <= level.time) {
+			level.lastAdTime = level.time + (10 * 60 * 1000);
+			level.lastAdIndex++;
+
+			switch (level.lastAdIndex)
+			{
+			case 1:
+				trap_SendServerCommand(ent - g_entities, va("print \"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t^5[^7Join the Duel Queue by Typing: ^5.j^5 ^7in Chat^5]\n\""));
+				break;
+			case 2:
+				trap_SendServerCommand(ent - g_entities, va("print \"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t^5[^7Follow us on Discord: ^5VK46Nd44du ^7for Queue Notifications^5]\n\""));
+			default:
+				level.lastAdIndex = 0;
+			}
+
+		}
+		// PowTecH: General end
 	}
 }
 
@@ -1436,7 +1455,7 @@ void ClientThink_real( gentity_t *ent ) {
 
 				// PowTecH: Duel Queue
 				if (ent->client->sess.inQueue && duelAgainst->client->sess.inQueue) {
-					trap_SendServerCommand(-1, va("print \"^2[^7NF Duel^2] %s ^7defeated %s ^7in %s ^7with ^%d%d ^7health left\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname, time, totalHealthColor, totalHealth));
+					trap_SendServerCommand(-1, va("print \"^2[^7NF Duel^2] ^7%s ^7defeated %s ^7in %s ^7with ^%d%d ^7health left\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname, time, totalHealthColor, totalHealth));
 				}
 				else {
 					trap_SendServerCommand(-1, va("print \"^2[^7Private NF Duel^2] %s ^7defeated %s ^7in %s ^7with ^%d%d ^7health left\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname, time, totalHealthColor, totalHealth));
@@ -1538,21 +1557,6 @@ void ClientThink_real( gentity_t *ent ) {
 			}
 		}
 	}
-
-
-	// PowTecH: Duel Queue
-	//if (level.queue[0] && 
-	//	level.queue[0] == ent && 
-	//	ent->client->ps.pm_type != PM_DEAD &&
-	//	level.queue[1] && 
-	//	level.queue[1]->client->ps.pm_type != PM_DEAD
-	//) {
-	//	if (((level.time / 1000) % 13) == 0) {
-
-	//		
-	//	}
-	//}
-	// PowTecH: Duel Queue end
 
 	/*
 	if ( client->ps.powerups[PW_HASTE] ) {
@@ -2061,7 +2065,7 @@ void G_RunClient( gentity_t *ent ) {
 
 	if ( ent->client->pers.botDelayed )
 	{ // Call ClientBegin for delayed bots now
-		ClientBegin( ent-g_entities, qtrue );
+		ClientBegin(ent - g_entities, qfalse, qtrue);
 		ent->client->pers.botDelayed = qfalse;
 	}
 
@@ -2104,7 +2108,7 @@ void SpectatorClientEndFrame( gentity_t *ent ) {
 				if ( ent->client->sess.spectatorClient >= 0 ) {
 					ent->client->sess.spectatorState = SPECTATOR_FREE;
 					memset( ent->client->ps.powerups, 0, sizeof(ent->client->ps.powerups) ); // Ensure following spectators don't take flags or such into ClientBegin and trigger the FlagEatingFix
-					ClientBegin( ent->client - level.clients, qtrue );
+					ClientBegin(ent->client - level.clients, qfalse, qtrue);
 				}
 			}
 		}

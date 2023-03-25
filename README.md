@@ -10,9 +10,17 @@ Road Map:
 - Currency
 - Unlocks/Property
 - Queued Dueling
+	- Phase 1 [March 19, 2023]
+		- Check the NF duel queue (/say .q)
+		- Join the NF duel queue (/say .j)
+		- Leave the NF duel queue (/say .l)
+		- Once selected from by the queue at random
+			- Teleport to a random duel location decided by a custom map entitiy (info_player_duel)
+				- Wont stack 2 sets of duelers on top of each other
+		- Once the round is over auto rejoin the queue
 
 # Thanks
-boy, fau, ouned
+boy, fau, ouned, flendo
 
 # JK2MV - SDK
 https://jk2mv.org

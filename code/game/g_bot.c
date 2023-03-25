@@ -630,7 +630,7 @@ void G_CheckBotSpawn( void ) {
 		if ( botSpawnQueue[n].spawnTime > level.time ) {
 			continue;
 		}
-		ClientBegin( botSpawnQueue[n].clientNum, qfalse );
+		ClientBegin(botSpawnQueue[n].clientNum, qfalse, qfalse);
 		botSpawnQueue[n].spawnTime = 0;
 
 		/*
@@ -660,7 +660,7 @@ static void AddBotToSpawnQueue( int clientNum, int delay ) {
 	}
 
 	G_Printf( S_COLOR_YELLOW "Unable to delay spawn\n" );
-	ClientBegin( clientNum, qfalse );
+	ClientBegin(clientNum, qfalse, qfalse);
 }
 
 
@@ -893,7 +893,7 @@ static void G_AddBot( const char *name, float skill, const char *team, int delay
 	}
 
 	if( delay == 0 ) {
-		ClientBegin( clientNum, qfalse );
+		ClientBegin(clientNum, qfalse, qfalse);
 		return;
 	}
 

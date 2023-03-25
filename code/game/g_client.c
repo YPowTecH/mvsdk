@@ -1545,7 +1545,7 @@ to be placed into the level.  This will happen every level load,
 and on transition between teams, but doesn't happen on respawns
 ============
 */
-void ClientBegin( int clientNum, qboolean allowTeamReset ) {
+void ClientBegin(int clientNum, qboolean firstTime, qboolean allowTeamReset) {
 	gentity_t	*ent;
 	gclient_t	*client;
 	gentity_t	*tent;
@@ -1619,7 +1619,7 @@ void ClientBegin( int clientNum, qboolean allowTeamReset ) {
 			ent->client->sess.sessionTeam = preSess;
 			G_WriteClientSessionData(ent->client);
 			ClientUserinfoChanged( clientNum );
-			ClientBegin(clientNum, qfalse);
+			ClientBegin(clientNum, qfalse, qfalse);
 			return;
 		}
 	}
@@ -1708,6 +1708,15 @@ void ClientBegin( int clientNum, qboolean allowTeamReset ) {
 		}
 	}
 	G_LogPrintf( "ClientBegin: %i\n", clientNum );
+
+	// PowTecH: General
+	if (firstTime) {
+		Cmd_Info_f(ent);
+	}
+
+	level.lastAdTime = level.time + (10 * 60 * 1000);
+	level.lastAdIndex = 0;
+	// PowTecH: General end
 
 	// count current clients and rank for scoreboard
 	CalculateRanks();
