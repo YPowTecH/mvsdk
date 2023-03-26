@@ -1212,3 +1212,56 @@ void G_ROFF_NotetrackCallback( gentity_t *cent, const char *notetrack)
 	}
 }
 
+// PowTecH: General
+void G_GoTo(gentity_t* ent, vec3_t origin, vec3_t angles) {
+	gentity_t* tent;
+
+	// Follow spectators don't need to teleport. And calling BG_PlayerStateToEntityState on them corrupts their s.number
+	if (ent->client->sess.spectatorState == SPECTATOR_FOLLOW) {
+		return;
+	}
+
+	// use temp events at source and destination to prevent the effect
+	// from getting dropped by a second player event
+	if (ent->client->sess.sessionTeam != TEAM_SPECTATOR) {
+		tent = G_TempEntity(ent->client->ps.origin, EV_PLAYER_TELEPORT_OUT);
+		tent->s.clientNum = ent->s.clientNum;
+
+		tent = G_TempEntity(origin, EV_PLAYER_TELEPORT_IN);
+		tent->s.clientNum = ent->s.clientNum;
+	}
+
+	// unlink to make sure it can't possibly interfere with G_KillBox
+	trap_UnlinkEntity(ent);
+
+	VectorCopy(origin, ent->client->ps.origin);
+	ent->client->ps.origin[2] += 1;
+
+	// spit the player out
+	AngleVectors(angles, ent->client->ps.velocity, NULL, NULL);
+	VectorScale(ent->client->ps.velocity, 1, ent->client->ps.velocity);
+	ent->client->ps.pm_time = 160;		// hold time
+	ent->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
+
+	// toggle the teleport bit so the client knows to not lerp
+	ent->client->ps.eFlags ^= EF_TELEPORT_BIT;
+
+	// set angles
+	SetClientViewAngle(ent, angles);
+
+	// kill anything at the destination
+	if (ent->client->sess.sessionTeam != TEAM_SPECTATOR) {
+		G_KillBox(ent);
+	}
+
+	// save results of pmove
+	BG_PlayerStateToEntityState(&ent->client->ps, &ent->s, qtrue);
+
+	// use the precise origin for linking
+	VectorCopy(ent->client->ps.origin, ent->r.currentOrigin);
+
+	if (ent->client->sess.sessionTeam != TEAM_SPECTATOR) {
+		trap_LinkEntity(ent);
+	}
+}
+// PowTecH: General end

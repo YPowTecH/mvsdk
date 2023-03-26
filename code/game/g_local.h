@@ -452,6 +452,14 @@ struct gclient_s {
 #define	MAX_SPAWN_VARS			64
 #define	MAX_SPAWN_VARS_CHARS	4096
 
+// PowTecH: General
+typedef struct {
+	char* name;
+	vec3_t		origin;
+	vec3_t		angles;
+} teleportCommand_t;
+// PowTecH: General end
+
 typedef struct {
 	struct gclient_s	*clients;		// [maxclients]
 
@@ -541,6 +549,7 @@ typedef struct {
 	// PowTecH: General
 	int			lastAdTime;
 	int			lastAdIndex;
+	teleportCommand_t teleportSpots[5];
 	// PowTecH: General end
 	// PowTecH: Account System
 	int			dbUserCount;
@@ -655,6 +664,10 @@ qboolean	G_EntitiesFree( void );
 
 void	G_TouchTriggers (gentity_t *ent);
 void	G_TouchSolids (gentity_t *ent);
+
+// PowTecH: General
+void	G_GoTo(gentity_t* ent, vec3_t origin, vec3_t angles);
+// PowTecH: General end
 
 //
 // g_object.c

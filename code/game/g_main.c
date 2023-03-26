@@ -713,7 +713,8 @@ G_InitGame
 ============
 */
 void G_InitGame( int levelTime, int randomSeed, int restart ) {
-	int					i;
+	int i;
+	gentity_t* spot = NULL;
 
 	B_InitAlloc(); //make sure everything is clean
 
@@ -896,6 +897,22 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	// PowTecH: General
 	G_Printf("^2[^7Init Server Settings^2]^7\n");
 	G_Printf("^2-----------------------------------\n");
+
+	i = 0;
+	while ((spot = G_Find(spot, FOFS(classname), "info_notnull")) != NULL &&
+		i < ARRAY_LEN(level.teleportSpots)) {
+		if (spot->message) {
+			teleportCommand_t tele;
+			tele.name = spot->message;
+
+			G_SetOrigin(spot, spot->s.origin);
+
+			VectorCopy(spot->s.origin, tele.origin);
+			VectorCopy(spot->s.angles, tele.angles);
+			level.teleportSpots[i] = tele;
+			i++;
+		}
+	}
 	// PowTecH: General end
 	// PowTecH: Account System
 	level.dbUserCount = -1;

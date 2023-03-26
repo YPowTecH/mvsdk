@@ -1123,6 +1123,12 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) 
 	}
 }
 
+// PowTecH: General
+static void Cmd_Teleport_f(gentity_t* ent, teleportCommand_t spot) {
+	G_GoTo(ent, spot.origin, spot.angles);
+}
+// PowTecH: General end
+
 // PowTecH: Duel Queue
 int G_CountQueue() {
 	int i;
@@ -1309,6 +1315,20 @@ static void Cmd_Say_f(gentity_t *ent) {
 		if (!strcmp(p, chatCommands[i].name)) {
 			command = &chatCommands[i];
 			break;
+		}
+	}
+
+	for (i = 0; i < ARRAY_LEN(level.teleportSpots); i++) {
+		if (!strcmp(p, level.teleportSpots[i].name)) {
+			if (level.intermissiontime || 
+				level.intermissionQueued || 
+				ent->health <= 0 || 
+				ent->client->sess.spectatorState != SPECTATOR_NOT) {
+				return;
+			}
+
+			Cmd_Teleport_f(ent, level.teleportSpots[i]);
+			return;
 		}
 	}
 

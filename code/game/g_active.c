@@ -1047,58 +1047,6 @@ static void G_EngageDuel(gentity_t* ent, gentity_t* duelAgainst) {
 	G_LeaveQueue(duelAgainst);
 }
 
-static void G_GoToArena(gentity_t* ent, vec3_t origin, vec3_t angles) {
-	gentity_t* tent;
-
-	// Follow spectators don't need to teleport. And calling BG_PlayerStateToEntityState on them corrupts their s.number
-	if (ent->client->sess.spectatorState == SPECTATOR_FOLLOW) { 
-		return;
-	}
-
-	// use temp events at source and destination to prevent the effect
-	// from getting dropped by a second player event
-	if (ent->client->sess.sessionTeam != TEAM_SPECTATOR) {
-		tent = G_TempEntity(ent->client->ps.origin, EV_PLAYER_TELEPORT_OUT);
-		tent->s.clientNum = ent->s.clientNum;
-
-		tent = G_TempEntity(origin, EV_PLAYER_TELEPORT_IN);
-		tent->s.clientNum = ent->s.clientNum;
-	}
-
-	// unlink to make sure it can't possibly interfere with G_KillBox
-	trap_UnlinkEntity(ent);
-
-	VectorCopy(origin, ent->client->ps.origin);
-	ent->client->ps.origin[2] += 1;
-
-	// spit the player out
-	AngleVectors(angles, ent->client->ps.velocity, NULL, NULL);
-	VectorScale(ent->client->ps.velocity, 1, ent->client->ps.velocity);
-	ent->client->ps.pm_time = 160;		// hold time
-	ent->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
-
-	// toggle the teleport bit so the client knows to not lerp
-	ent->client->ps.eFlags ^= EF_TELEPORT_BIT;
-
-	// set angles
-	SetClientViewAngle(ent, angles);
-
-	// kill anything at the destination
-	if (ent->client->sess.sessionTeam != TEAM_SPECTATOR) {
-		G_KillBox(ent);
-	}
-
-	// save results of pmove
-	BG_PlayerStateToEntityState(&ent->client->ps, &ent->s, qtrue);
-
-	// use the precise origin for linking
-	VectorCopy(ent->client->ps.origin, ent->r.currentOrigin);
-
-	if (ent->client->sess.sessionTeam != TEAM_SPECTATOR) {
-		trap_LinkEntity(ent);
-	}
-}
-
 static qboolean G_ArenaInUse(gentity_t* spot) {
 	int			i, num;
 	int			touch[MAX_GENTITIES];
@@ -1165,7 +1113,7 @@ static qboolean G_SpawnAtDuel(gentity_t* ent, gentity_t* duelAgainst) {
 
 	VectorCopy(spot->s.origin, otherOrigin);
 
-	G_GoToArena(ent, spot->s.origin, spot->s.angles);
+	G_GoTo(ent, spot->s.origin, spot->s.angles);
 
 	if (spot->s.angles[YAW] == 90) {
 		otherAngles[YAW] = otherAngles[YAW] - 90;
@@ -1176,7 +1124,7 @@ static qboolean G_SpawnAtDuel(gentity_t* ent, gentity_t* duelAgainst) {
 		otherOrigin[0] = otherOrigin[0] + 256;
 	}
 
-	G_GoToArena(duelAgainst, otherOrigin, otherAngles);
+	G_GoTo(duelAgainst, otherOrigin, otherAngles);
 
 	return qtrue;
 }
@@ -1510,9 +1458,10 @@ void ClientThink_real( gentity_t *ent ) {
 				if (duelAgainst->client->sess.inQueue) {
 					duelAgainst->client->sess.inQueue = qfalse;
 				}
-				// PowTecH: Duel Queue end
 
-				trap_SendServerCommand( -1, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "PLDUELSTOP")) );
+				trap_SendServerCommand(ent - g_entities, Pow_Output("Duel Canceled", 1));
+				trap_SendServerCommand(duelAgainst - g_entities, Pow_Output("Duel Canceled", 1));
+				// PowTecH: Duel Queue end
 			}
 		}
 	}
@@ -1521,7 +1470,7 @@ void ClientThink_real( gentity_t *ent ) {
 		level.queue[0] == ent && 
 		level.queue[1]) 
 	{
-		if (((level.time / 1000) % 13) == 0 || 
+		if (((level.time / 1000) % 23) == 0 || 
 			ent->client->sess.retryQueue || 
 			level.queue[1]->client->sess.retryQueue) 
 		{
