@@ -3036,28 +3036,25 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		return;
 	}
 
-	if (targ && targ->client && targ->client->ps.duelInProgress)
-	{
-		if (attacker && attacker->client && attacker->s.number != targ->client->ps.duelIndex)
-		{
+	// PowTecH: Dueling
+	if (targ && targ->client && targ->client->ps.duelInProgress) {
+		if (attacker && attacker->client && attacker->s.number != targ->client->ps.duelIndex) {
 			return;
 		}
-		else if (attacker && attacker->client && mod != MOD_SABER)
-		{
-			return;
-		}
-	}
-	if (attacker && attacker->client && attacker->client->ps.duelInProgress)
-	{
-		if (targ && targ->client && targ->s.number != attacker->client->ps.duelIndex)
-		{
-			return;
-		}
-		else if (targ && targ->client && mod != MOD_SABER)
-		{
+		else if (attacker && attacker->client && mod != MOD_SABER && !attacker->client->duelFF) {
 			return;
 		}
 	}
+
+	if (attacker && attacker->client && attacker->client->ps.duelInProgress) {
+		if (targ && targ->client && targ->s.number != attacker->client->ps.duelIndex) {
+			return;
+		}
+		else if (targ && targ->client && mod != MOD_SABER && !targ->client->duelFF) {
+			return;
+		}
+	}
+	// PowTecH: Dueling end
 
 	if (targ && targ->client && (targ->client->ps.fd.forcePowersActive & (1 << FP_RAGE)))
 	{

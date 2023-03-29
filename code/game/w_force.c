@@ -603,31 +603,44 @@ void WP_SpawnInitForcePowers( gentity_t *ent )
 	}
 }
 
-int ForcePowerUsableOn(gentity_t *attacker, gentity_t *other, forcePowers_t forcePower)
-{
-	if (other && other->client && other->client->ps.usingATST)
-	{
+int ForcePowerUsableOn(gentity_t *ent, gentity_t *other, forcePowers_t forcePower) {
+	if (!other || !other->client) {
 		return 0;
 	}
 
-	if (other && other->client && BG_HasYsalamiri(g_gametype.integer, &other->client->ps))
-	{
+	if (other->client->ps.usingATST) {
 		return 0;
 	}
 
-	if (attacker && attacker->client && !BG_CanUseFPNow(g_gametype.integer, &attacker->client->ps, level.time, forcePower))
-	{
+	if (BG_HasYsalamiri(g_gametype.integer, &other->client->ps)) {
 		return 0;
 	}
+
+	if (!ent || !ent->client) {
+		return 0;
+	}
+
+	// PowTecH: Dueling
+	if (!BG_CanUseFPNow(g_gametype.integer, &ent->client->ps, level.time, forcePower, ent->client->duelFF)) {
+		return qfalse;
+	}
+
+	if (ent->client->ps.duelInProgress &&
+		other->client->ps.duelInProgress && 
+		ent->client->duelFF &&
+		other->client->duelFF && 
+		ent->client->ps.duelIndex == other->s.number)
+	{
+		return 1;
+	}
+	// PowTecH: Dueling end
 
 	//Dueling fighters cannot use force powers on others, with the exception of force push when locked with each other
-	if (attacker && attacker->client && attacker->client->ps.duelInProgress)
-	{
+	if (ent->client->ps.duelInProgress) {
 		return 0;
 	}
 
-	if (other && other->client && other->client->ps.duelInProgress)
-	{
+	if (other->client->ps.duelInProgress) {
 		return 0;
 	}
 
@@ -655,6 +668,13 @@ qboolean WP_ForcePowerAvailable( gentity_t *self, forcePowers_t forcePower )
 	{
 		return qfalse;
 	}
+
+	// PowTecH: Dueling
+	if (self->client->ps.duelInProgress && self->client->duelFF) {
+		return qtrue;
+	}
+	// PowTecH: Dueling end
+
 	return qtrue;
 }
 
@@ -690,10 +710,11 @@ qboolean WP_ForcePowerUsable( gentity_t *self, forcePowers_t forcePower )
 		return qfalse;
 	}
 
-	if (!BG_CanUseFPNow(g_gametype.integer, &self->client->ps, level.time, forcePower))
-	{
+	// PowTecH: Dueling
+	if (!BG_CanUseFPNow(g_gametype.integer, &self->client->ps, level.time, forcePower, self->client->duelFF)) {
 		return qfalse;
 	}
+	// PowTecH: Dueling end
 
 	if ( !(self->client->ps.fd.forcePowersKnown & ( 1 << forcePower )) )
 	{//don't know this power
@@ -4639,12 +4660,16 @@ void WP_ForcePowersUpdate( gentity_t *self, usercmd_t *ucmd )
 		i = 0;
 
 		while (i < NUM_FORCE_POWERS)
-		{
-			if ((self->client->ps.fd.forcePowersActive & (1 << i)) && i != FP_LEVITATION &&
-				!BG_CanUseFPNow(g_gametype.integer, &self->client->ps, level.time, i))
+		{ 
+			// PowTecH: Dueling
+			if ((self->client->ps.fd.forcePowersActive &
+				(1 << i)) &&
+				i != FP_LEVITATION &&
+				!BG_CanUseFPNow(g_gametype.integer, &self->client->ps, level.time, i, self->client->duelFF))
 			{
 				WP_ForcePowerStop(self, i);
 			}
+			// PowTecH: Dueling end
 
 			i++;
 		}
@@ -4785,7 +4810,7 @@ void WP_ForcePowersUpdate( gentity_t *self, usercmd_t *ucmd )
 	}
 
 #ifndef METROID_JUMP
-	else if ( (ucmd->upmove > 10) && (self->client->ps.pm_flags & PMF_JUMP_HELD) && self->client->ps.groundTime && (level.time - self->client->ps.groundTime) > 150 && !BG_HasYsalamiri(g_gametype.integer, &self->client->ps) && BG_CanUseFPNow(g_gametype.integer, &self->client->ps, level.time, FP_LEVITATION) )
+	else if ((ucmd->upmove > 10) && (self->client->ps.pm_flags & PMF_JUMP_HELD) && self->client->ps.groundTime && (level.time - self->client->ps.groundTime) > 150 && !BG_HasYsalamiri(g_gametype.integer, &self->client->ps) && BG_CanUseFPNow(g_gametype.integer, &self->client->ps, level.time, FP_LEVITATION, self->client->duelFF)) // PowTecH: Dueling
 	{//just charging up
 		ForceJumpCharge( self, ucmd );
 		usingForce = qtrue;
@@ -4862,8 +4887,8 @@ void WP_ForcePowersUpdate( gentity_t *self, usercmd_t *ucmd )
 		}
 	}
 
-	if ( (ucmd->buttons & BUTTON_FORCEPOWER) &&
-		BG_CanUseFPNow(g_gametype.integer, &self->client->ps, level.time, self->client->ps.fd.forcePowerSelected))
+	if ((ucmd->buttons & BUTTON_FORCEPOWER) &&
+		BG_CanUseFPNow(g_gametype.integer, &self->client->ps, level.time, self->client->ps.fd.forcePowerSelected, self->client->duelFF)) // PowTecH: Dueling
 	{
 		if (self->client->ps.fd.forcePowerSelected == FP_LEVITATION)
 		{

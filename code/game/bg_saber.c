@@ -1444,8 +1444,7 @@ void PM_WeaponLightsaber(void)
 		pm->ps->saberCanThrow &&
 		pm->ps->fd.forcePower >= forcePowerNeeded[pm->ps->fd.forcePowerLevel[FP_SABERTHROW]][FP_SABERTHROW] &&
 		!BG_HasYsalamiri(pm->gametype, pm->ps) &&
-		BG_CanUseFPNow(pm->gametype, pm->ps, pm->cmd.serverTime, FP_SABERTHROW)
-		)
+		BG_CanUseFPNow(pm->gametype, pm->ps, pm->cmd.serverTime, FP_SABERTHROW, pm->duelFF)) // PowTecH: Dueling
 	{ //might as well just check for a saber throw right here
 		//This will get set to false again once the saber makes it back to its owner game-side
 		if (!pm->ps->saberInFlight)

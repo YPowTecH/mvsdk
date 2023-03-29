@@ -1318,51 +1318,50 @@ qboolean BG_HasYsalamiri(int gametype, playerState_t *ps)
 	return qfalse;
 }
 
-qboolean BG_CanUseFPNow(int gametype, playerState_t *ps, int time, forcePowers_t power)
+// PowTecH: Dueling
+qboolean BG_CanUseFPNow(int gametype, playerState_t *ps, int time, forcePowers_t power, qboolean duelFF)
 {
-	if (BG_HasYsalamiri(gametype, ps))
-	{
+	if (BG_HasYsalamiri(gametype, ps)) {
 		return qfalse;
 	}
 
-	if ( ps->forceRestricted || ps->trueNonJedi )
-	{
+	if (ps->forceRestricted || ps->trueNonJedi) {
 		return qfalse;
 	}
 
-	if (ps->duelInProgress)
-	{
-		if (power != FP_SABERATTACK && power != FP_SABERDEFEND && (jk2gameplay == VERSION_1_04 || power != FP_SABERTHROW) &&
+	if (ps->duelInProgress && !duelFF) {
+		if (power != FP_SABERATTACK && 
+			power != FP_SABERDEFEND && (jk2gameplay == VERSION_1_04 || 
+				power != FP_SABERTHROW) &&
 			power != FP_LEVITATION)
 		{
-			if (!ps->saberLockFrame || power != FP_PUSH)
-			{
+			if (!ps->saberLockFrame || power != FP_PUSH) {
 				return qfalse;
 			}
 		}
 	}
 
-	if (ps->saberLockFrame || ps->saberLockTime > time)
-	{
-		if (power != FP_PUSH)
-		{
+	if (ps->saberLockFrame || ps->saberLockTime > time) {
+		if (power != FP_PUSH) {
 			return qfalse;
 		}
 	}
 
-	if (ps->fallingToDeath)
-	{
+	if (ps->fallingToDeath) {
 		return qfalse;
 	}
 
-	if ( power == FP_SABERTHROW && (ps->weaponstate == WEAPON_RAISING || ps->weaponstate == WEAPON_DROPPING) )
-	{ // WP_SaberPositionUpdate doesn't handle saberthrow while in the above weaponstates. Instead the saber just flies away and never returns.
-	  // Changing WP_SaberPositionUpdate to handle saberthrow in those states would make it possible to throw the saber in situations it wasn't possible before, so instead we just disable throw in those weaponstates to prevent sabers from getting lost.
+	// WP_SaberPositionUpdate doesn't handle saberthrow while in the above weaponstates. Instead the saber just flies away and never returns.
+	// Changing WP_SaberPositionUpdate to handle saberthrow in those states would make it possible to throw the saber in situations it wasn't possible before, so instead we just disable throw in those weaponstates to prevent sabers from getting lost.
+	if (power == FP_SABERTHROW && (ps->weaponstate == WEAPON_RAISING || 
+		ps->weaponstate == WEAPON_DROPPING))
+	{
 		return qfalse;
 	}
 
 	return qtrue;
 }
+// PowTecH: Dueling end
 
 /*
 ==============

@@ -1020,7 +1020,7 @@ static void G_FinishDuel(gentity_t* ent)
 // PowTecH: Duel Queue
 #define	MAX_SPAWN_POINTS	128
 
-static void G_EngageDuel(gentity_t* ent, gentity_t* duelAgainst) {
+static void G_StartDuel(gentity_t* ent, gentity_t* duelAgainst) {
 	ent->client->ps.duelIndex = duelAgainst->s.number;
 	duelAgainst->client->ps.duelIndex = ent->s.number;
 
@@ -1176,7 +1176,7 @@ static qboolean G_SetupDuel(gentity_t* ent, gentity_t* duelAgainst) {
 		G_AddEvent(ent, EV_PRIVATE_DUEL, 0);
 		G_AddEvent(duelAgainst, EV_PRIVATE_DUEL, 0);
 
-		G_EngageDuel(ent, duelAgainst);
+		G_StartDuel(ent, duelAgainst);
 
 		return qtrue;
 	}
@@ -1406,7 +1406,12 @@ void ClientThink_real( gentity_t *ent ) {
 					trap_SendServerCommand(-1, va("print \"^2[^7NF Duel^2] ^7%s ^7defeated %s ^7in %s ^7with ^%d%d ^7health left\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname, time, totalHealthColor, totalHealth));
 				}
 				else {
-					trap_SendServerCommand(-1, va("print \"^2[^7Private NF Duel^2] %s ^7defeated %s ^7in %s ^7with ^%d%d ^7health left\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname, time, totalHealthColor, totalHealth));
+					if (ent->client->duelFF) {
+						trap_SendServerCommand(-1, va("print \"^2[^7Private FF Duel^2] %s ^7defeated %s ^7in %s ^7with ^%d%d ^7health left\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname, time, totalHealthColor, totalHealth));
+					}
+					else {
+						trap_SendServerCommand(-1, va("print \"^2[^7Private NF Duel^2] %s ^7defeated %s ^7in %s ^7with ^%d%d ^7health left\n\"", ent->client->pers.netname, duelAgainst->client->pers.netname, time, totalHealthColor, totalHealth));
+					}
 				}
 				// PowTecH: Duel Queue end
 			}
@@ -1420,6 +1425,9 @@ void ClientThink_real( gentity_t *ent ) {
 
 			G_FinishDuel(ent);
 			G_FinishDuel(duelAgainst);
+
+			ent->client->duelFF = qfalse;
+			duelAgainst->client->duelFF = qfalse;
 
 			// PowTecH: Duel Queue
 			if (ent->client->sess.inQueue) {
@@ -1446,6 +1454,9 @@ void ClientThink_real( gentity_t *ent ) {
 			{
 				ent->client->ps.duelInProgress = 0;
 				duelAgainst->client->ps.duelInProgress = 0;
+
+				ent->client->duelFF = qfalse;
+				duelAgainst->client->duelFF = qfalse;
 
 				G_AddEvent(ent, EV_PRIVATE_DUEL, 0);
 				G_AddEvent(duelAgainst, EV_PRIVATE_DUEL, 0);
@@ -1657,6 +1668,10 @@ void ClientThink_real( gentity_t *ent ) {
 			pm.cmd.buttons |= BUTTON_GESTURE;
 		}
 	}
+
+	// PowTecH: Dueling
+	pm.duelFF = ent->client->duelFF;
+	// PowTecH: Dueling end
 
 	Pmove (&pm);
 

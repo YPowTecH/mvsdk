@@ -559,10 +559,11 @@ qboolean PM_ForceJumpingUp(void)
 		return qfalse;
 	}
 
-	if (!BG_CanUseFPNow(pm->gametype, pm->ps, pm->cmd.serverTime, FP_LEVITATION))
-	{
+	// PowTecH: Dueling
+	if (!BG_CanUseFPNow(pm->gametype, pm->ps, pm->cmd.serverTime, FP_LEVITATION, pm->duelFF)) {
 		return qfalse;
 	}
+	// PowTecH: Dueling end
 
 	if ( pm->ps->groundEntityNum == ENTITYNUM_NONE && //in air
 		(pm->ps->pm_flags & PMF_JUMP_HELD) && //jumped
@@ -1007,12 +1008,13 @@ static qboolean PM_CheckJump( void )
 		}//else no surf close enough to push off of
 		pm->cmd.upmove = 0;
 	}
-	else if ( pm->cmd.upmove > 0 && pm->waterlevel < 2 &&
+	else if (pm->cmd.upmove > 0 &&
+		pm->waterlevel < 2 &&
 		pm->ps->fd.forcePowerLevel[FP_LEVITATION] > FORCE_LEVEL_0 &&
 		!(pm->ps->pm_flags&PMF_JUMP_HELD) &&
 		pm->ps->weapon == WP_SABER &&
 		!BG_HasYsalamiri(pm->gametype, pm->ps) &&
-		BG_CanUseFPNow(pm->gametype, pm->ps, pm->cmd.serverTime, FP_LEVITATION) )
+		BG_CanUseFPNow(pm->gametype, pm->ps, pm->cmd.serverTime, FP_LEVITATION, pm->duelFF)) // PowTecH: Dueling
 	{
 		if ( pm->ps->groundEntityNum != ENTITYNUM_NONE )
 		{//on the ground
@@ -1923,11 +1925,15 @@ static int PM_TryRoll( void )
 		return 0;
 	}
 
-	if (pm->ps->weapon != WP_SABER || BG_HasYsalamiri(pm->gametype, pm->ps) ||
-		!BG_CanUseFPNow(pm->gametype, pm->ps, pm->cmd.serverTime, FP_LEVITATION))
-	{ //Not using saber, or can't use jump
+	// PowTecH: Dueling
+	//Not using saber, or can't use jump
+	if (pm->ps->weapon != WP_SABER ||
+		BG_HasYsalamiri(pm->gametype, pm->ps) ||
+		!BG_CanUseFPNow(pm->gametype, pm->ps, pm->cmd.serverTime, FP_LEVITATION, pm->duelFF))
+	{ 
 		return 0;
 	}
+	// PowTecH: Dueling end
 
 	VectorSet(mins, pm->mins[0],pm->mins[1],pm->mins[2]+STEPSIZE);
 	VectorSet(maxs, pm->maxs[0],pm->maxs[1],CROUCH_MAXS_2);

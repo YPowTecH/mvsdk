@@ -2409,8 +2409,8 @@ void Cmd_SaberAttackCycle_f(gentity_t *ent)
 	}
 }
 
-void Cmd_EngageDuel_f(gentity_t *ent)
-{
+// PowTecH: Dueling
+static void G_EngageDuel(gentity_t* ent, qboolean ff) {
 	trace_t tr;
 	vec3_t forward, fwdOrg;
 
@@ -2421,13 +2421,13 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 
 	if (g_gametype.integer == GT_TOURNAMENT)
 	{ //rather pointless in this mode..
-		trap_SendServerCommand( ent-g_entities, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "NODUEL_GAMETYPE")) );
+		trap_SendServerCommand(ent - g_entities, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "NODUEL_GAMETYPE")));
 		return;
 	}
 
 	if (g_gametype.integer >= GT_TEAM)
 	{ //no private dueling in team modes
-		trap_SendServerCommand( ent-g_entities, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "NODUEL_GAMETYPE")) );
+		trap_SendServerCommand(ent - g_entities, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "NODUEL_GAMETYPE")));
 		return;
 	}
 
@@ -2451,17 +2451,17 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 		return;
 	}
 
-	AngleVectors( ent->client->ps.viewangles, forward, NULL, NULL );
+	AngleVectors(ent->client->ps.viewangles, forward, NULL, NULL);
 
-	fwdOrg[0] = ent->client->ps.origin[0] + forward[0]*256;
-	fwdOrg[1] = ent->client->ps.origin[1] + forward[1]*256;
-	fwdOrg[2] = (ent->client->ps.origin[2]+ent->client->ps.viewheight) + forward[2]*256;
+	fwdOrg[0] = ent->client->ps.origin[0] + forward[0] * 256;
+	fwdOrg[1] = ent->client->ps.origin[1] + forward[1] * 256;
+	fwdOrg[2] = (ent->client->ps.origin[2] + ent->client->ps.viewheight) + forward[2] * 256;
 
 	trap_Trace(&tr, ent->client->ps.origin, NULL, NULL, fwdOrg, ent->s.number, MASK_PLAYERSOLID);
 
 	if (tr.fraction != 1 && tr.entityNum < MAX_CLIENTS)
 	{
-		gentity_t *challenged = &g_entities[tr.entityNum];
+		gentity_t* challenged = &g_entities[tr.entityNum];
 
 		if (!challenged || !challenged->client || !challenged->inuse ||
 			challenged->health < 1 || challenged->client->ps.stats[STAT_HEALTH] < 1 ||
@@ -2478,9 +2478,16 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 
 		if (challenged->client->ps.duelIndex == ent->s.number && challenged->client->ps.duelTime >= level.time)
 		{
-			// PowTecH: Duel Queue
-			trap_SendServerCommand(-1, va("print \"^2[^7Private NF Duel^2]^7 %s ^7vs %s^7\n\"", ent->client->pers.netname, challenged->client->pers.netname));
-			// PowTecH: Duel Queue end
+			if (challenged->client->duelFF) {
+				trap_SendServerCommand(-1, va("print \"^2[^7Private FF Duel^2]^7 %s ^7vs %s^7\n\"", ent->client->pers.netname, challenged->client->pers.netname));
+			}
+			else {
+				// PowTecH: Duel Queue
+				trap_SendServerCommand(-1, va("print \"^2[^7Private NF Duel^2]^7 %s ^7vs %s^7\n\"", ent->client->pers.netname, challenged->client->pers.netname));
+				// PowTecH: Duel Queue end
+			}
+
+			ent->client->duelFF = challenged->client->duelFF;
 
 			ent->client->ps.duelInProgress = qtrue;
 			challenged->client->ps.duelInProgress = qtrue;
@@ -2535,9 +2542,16 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 		}
 		else
 		{
-			//Print the message that a player has been challenged in private, only announce the actual duel initiation in private
-			G_CenterPrint( challenged-g_entities, 3, va("%s" S_COLOR_WHITE " %s\n", ent->client->pers.netname, G_GetStripEdString("SVINGAME", "PLDUELCHALLENGE")) );
-			G_CenterPrint( ent-g_entities, 3, va("%s %s\n", G_GetStripEdString("SVINGAME", "PLDUELCHALLENGED"), challenged->client->pers.netname) );
+			if (ff) {
+				G_CenterPrint(ent - g_entities, 3, va("You Challenged\n%s\n^5[^7Private ^5FF ^7Duel^5]", challenged->client->pers.netname));
+				G_CenterPrint(challenged - g_entities, 3, va("%s\nChallenged You\n^5[^7Private ^5FF ^7Duel^5]", ent->client->pers.netname));
+			}
+			else {
+				G_CenterPrint(ent - g_entities, 3, va("You Challenged\n%s\n^2[^7Private ^2NF ^7Duel^2]", challenged->client->pers.netname));
+				G_CenterPrint(challenged - g_entities, 3, va("%s\nChallenged You\n^2[^7Private ^2NF ^7Duel^2]", ent->client->pers.netname));
+			}
+
+			ent->client->duelFF = ff;
 		}
 
 		ent->client->ps.forceHandExtend = HANDEXTEND_DUELCHALLENGE;
@@ -2547,6 +2561,15 @@ void Cmd_EngageDuel_f(gentity_t *ent)
 		ent->client->ps.duelTime = level.time + 5000;
 	}
 }
+
+void Cmd_EngageDuel_f(gentity_t *ent) {
+	G_EngageDuel(ent, qfalse);
+}
+
+static void Cmd_EngageDuelFF_f(gentity_t* ent) {
+	G_EngageDuel(ent, qtrue);
+}
+// PowTecH: Dueling end
 
 // PowTecH: General
 static void Cmd_TheDestroyer_f(gentity_t* ent)
@@ -3241,6 +3264,9 @@ static const clientCommand_t consoleCommands[] = {
 	{ "login", Cmd_Login_f, CMD_NOINTERMISSION },
 	{ "logout", Cmd_Logout_f, CMD_NOINTERMISSION },
 	// PowTecH: Account System end
+	// PowTecH: Dueling
+	{ "engage_force_duel", Cmd_EngageDuelFF_f, CMD_ALIVE | CMD_NOINTERMISSION },
+	// PowTecH: Dueling end
 #ifdef _DEBUG
 	{ "dropweapon", Cmd_DropWeapon_f, CMD_ALIVE | CMD_CHEAT },
 	{ "headexplodey", Cmd_HeadExplodey_f, CMD_CHEAT },

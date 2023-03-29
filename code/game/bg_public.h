@@ -287,6 +287,10 @@ typedef struct {
 
 	playerState_t	*bgClients[MAX_CLIENTS];
 	int			checkDuelLoss;
+
+	// PowTecH: Dueling
+	qboolean	duelFF;
+	// PowTecH: Dueling end
 } pmove_t;
 
 extern	pmove_t		*pm;
@@ -1056,7 +1060,10 @@ qboolean	BG_ParseAnimationFile(const char *filename);
 int BG_GetItemIndexByTag(int tag, itemType_t type);
 
 qboolean BG_HasYsalamiri(int gametype, playerState_t *ps);
-qboolean BG_CanUseFPNow(int gametype, playerState_t *ps, int time, forcePowers_t power);
+
+// PowTecH: Dueling
+qboolean BG_CanUseFPNow(int gametype, playerState_t *ps, int time, forcePowers_t power, qboolean duelFF);
+// PowTecH: Dueling end
 
 void *BG_Alloc ( int size );
 void *BG_AllocUnaligned ( int size );

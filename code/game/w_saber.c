@@ -3256,11 +3256,12 @@ void saberFirstThrown(gentity_t *saberent)
 		goto runMin;
 	}
 	
-	if (!BG_CanUseFPNow(g_gametype.integer, &saberOwn->client->ps, level.time, FP_SABERTHROW))
-	{
+	// PowTecH: Dueling
+	if (!BG_CanUseFPNow(g_gametype.integer, &saberOwn->client->ps, level.time, FP_SABERTHROW, saberOwn->client->duelFF)) {
 		thrownSaberTouch(saberent, saberent, NULL);
 		goto runMin;
 	}
+	// PowTecH: Dueling end
 
 	VectorSubtract(saberOwn->client->ps.origin, saberent->r.currentOrigin, vSub);
 	vLen = VectorLength(vSub);

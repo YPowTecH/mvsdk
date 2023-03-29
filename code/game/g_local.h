@@ -443,6 +443,10 @@ struct gclient_s {
 	int			forcePowerSoundDebounce; //if > level.time, don't do certain sound events again (drain sound, absorb sound, etc)
 
 	qboolean	fjDidJump;
+
+	// PowTecH: Dueling
+	qboolean	duelFF;
+	// PowTecH: Dueling end
 };
 
 
@@ -966,7 +970,7 @@ void WP_SaberInitBladeData( gentity_t *ent );
 void WP_InitForcePowers( gentity_t *ent );
 void WP_SpawnInitForcePowers( gentity_t *ent );
 void WP_ForcePowersUpdate( gentity_t *self, usercmd_t *ucmd );
-int ForcePowerUsableOn(gentity_t *attacker, gentity_t *other, forcePowers_t forcePower);
+int ForcePowerUsableOn(gentity_t *ent, gentity_t *other, forcePowers_t forcePower);
 void ForceHeal( gentity_t *self );
 void ForceSpeed( gentity_t *self, int forceDuration );
 void ForceRage( gentity_t *self );
