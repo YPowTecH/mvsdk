@@ -3472,6 +3472,10 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
 	// do the damage
 	if (take) {
+		if (targ->client) {
+			ScorePlum(attacker, targ->client->ps.origin, take);
+		}
+
 		if (targ->client && (targ->client->ps.fd.forcePowersActive & (1 << FP_RAGE)) && (inflictor->client || attacker->client))
 		{
 			take /= (targ->client->ps.fd.forcePowerLevel[FP_RAGE]+1);

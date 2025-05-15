@@ -120,8 +120,6 @@ void SP_info_secondplace(gentity_t *ent);
 void SP_info_thirdplace(gentity_t *ent);
 void SP_info_podium(gentity_t *ent);
 
-void SP_info_saga_objective (gentity_t *ent);
-
 void SP_func_plat (gentity_t *ent);
 void SP_func_static (gentity_t *ent);
 void SP_func_rotating (gentity_t *ent);
@@ -209,9 +207,6 @@ spawn_t	spawns[] = {
 	{"info_null", SP_info_null},
 	{"info_notnull", SP_info_notnull},		// use target_position instead
 	{"info_camp", SP_info_camp},
-
-	{"info_saga_objective", SP_info_saga_objective},
-
 	{"func_plat", SP_func_plat},
 	{"func_button", SP_func_button},
 	{"func_door", SP_func_door},

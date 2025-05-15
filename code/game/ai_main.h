@@ -10,6 +10,10 @@
 #define MAX_WPARRAY_SIZE 4096
 #define MAX_NEIGHBOR_SIZE 32
 
+// PowTecH - Defines
+#define MAX_WP_CONNECTION_SIZE 8
+//
+
 #define MAX_NEIGHBOR_LINK_DISTANCE 128
 #define MAX_NEIGHBOR_FORCEJUMP_LINK_DISTANCE 400
 
@@ -32,8 +36,6 @@
 #define WPFLAG_GOALPOINT		0x00010000 //make it a goal to get here.. goal points will be decided by setting "weight" values
 #define WPFLAG_RED_FLAG			0x00020000 //red flag
 #define WPFLAG_BLUE_FLAG		0x00040000 //blue flag
-#define WPFLAG_SAGA_REBELOBJ	0x00080000 //rebel saga objective
-#define WPFLAG_SAGA_IMPERIALOBJ	0x00100000 //imperial saga objective
 #define WPFLAG_NOMOVEFUNC		0x00200000 //don't move over if a func is under
 
 #define LEVELFLAG_NOPOINTPREDICTION			1 //don't take waypoint beyond current into account when adjusting path view angles
@@ -90,14 +92,6 @@ typedef enum
 
 typedef enum
 {
-	SAGASTATE_NONE,
-	SAGASTATE_ATTACKER,
-	SAGASTATE_DEFENDER,
-	SAGASTATE_MAXSAGASTATES
-} bot_saga_state_t;
-
-typedef enum
-{
 	TEAMPLAYSTATE_NONE,
 	TEAMPLAYSTATE_FOLLOWING,
 	TEAMPLAYSTATE_ASSISTING,
@@ -110,6 +104,14 @@ typedef struct wpneighbor_s
 	int num;
 	int forceJumpTo;
 } wpneighbor_t;
+
+// PowTecH - Structs
+typedef struct wpconnection_s
+{
+	int index;
+	float distance;
+} wpconnection_t;
+//
 
 typedef struct wpobject_s
 {
@@ -126,6 +128,11 @@ typedef struct wpobject_s
 	int neighbornum;
 	//int neighbors[MAX_NEIGHBOR_SIZE];
 	wpneighbor_t neighbors[MAX_NEIGHBOR_SIZE];
+
+	// PowTecH - Properties
+	wpconnection_t connections[MAX_WP_CONNECTION_SIZE];
+	int connectionsCount;
+	//
 } wpobject_t;
 
 typedef struct botattachment_s
@@ -348,6 +355,11 @@ typedef struct bot_state_s
 	int					noUseTime;
 	qboolean			doingFallback;
 	//end rww
+
+	// PowTecH - Properties
+	int* wpToGoal[MAX_NEIGHBOR_LINK_DISTANCE];
+	int* wpToGoalCount;
+	//
 } bot_state_t;
 
 void *B_TempAlloc(int size);
@@ -363,7 +375,6 @@ int NumBots(void);
 
 void BotUtilizePersonality(bot_state_t *bs);
 int BotDoChat(bot_state_t *bs, char *section, int always);
-void StandardBotAI(bot_state_t *bs, float thinktime);
 void BotWaypointRender(void);
 int OrgVisibleBox(vec3_t org1, vec3_t mins, vec3_t maxs, vec3_t org2, int ignore);
 int BotIsAChickenWuss(bot_state_t *bs);

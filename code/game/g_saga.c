@@ -353,28 +353,3 @@ void sagaTriggerUse(gentity_t *ent, gentity_t *other, gentity_t *activator)
 	}
 }
 
-
-/*QUAKED info_saga_objective (1 0 1) (-16 -16 -24) (16 16 32)
-"objective" - specifies the objective to complete upon activation
-"side" - set to 1 to specify an imperial goal, 2 to specify rebels
-*/
-void SP_info_saga_objective (gentity_t *ent)
-{
-	if (!saga_valid || g_gametype.integer != GT_SAGA)
-	{
-		G_FreeEntity(ent);
-		return;
-	}
-
-	ent->use = sagaTriggerUse;
-	G_SpawnInt( "objective", "0", &ent->objective);
-	G_SpawnInt( "side", "0", &ent->side);
-
-	if (!ent->objective || !ent->side)
-	{ //j00 fux0red something up
-		G_FreeEntity(ent);
-		G_Printf("ERROR: info_saga_objective without an objective or side value\n");
-		return;
-	}
-}
-

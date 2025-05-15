@@ -142,56 +142,6 @@ char *GetFlagStr( int flags )
 		i++;
 	}
 
-	if (flags & WPFLAG_SAGA_IMPERIALOBJ)
-	{
-		if (i)
-		{
-			flagstr[i] = ' ';
-			i++;
-		}
-		flagstr[i] = 's';
-		i++;
-		flagstr[i] = 'a';
-		i++;
-		flagstr[i] = 'g';
-		i++;
-		flagstr[i] = 'a';
-		i++;
-		flagstr[i] = '_';
-		i++;
-		flagstr[i] = 'i';
-		i++;
-		flagstr[i] = 'm';
-		i++;
-		flagstr[i] = 'p';
-		i++;
-	}
-
-	if (flags & WPFLAG_SAGA_REBELOBJ)
-	{
-		if (i)
-		{
-			flagstr[i] = ' ';
-			i++;
-		}
-		flagstr[i] = 's';
-		i++;
-		flagstr[i] = 'a';
-		i++;
-		flagstr[i] = 'g';
-		i++;
-		flagstr[i] = 'a';
-		i++;
-		flagstr[i] = '_';
-		i++;
-		flagstr[i] = 'r';
-		i++;
-		flagstr[i] = 'e';
-		i++;
-		flagstr[i] = 'b';
-		i++;
-	}
-
 	flagstr[i] = '\0';
 
 	if (i == 0)
@@ -237,7 +187,8 @@ void BotWaypointRender(void)
 
 	if (gWPRenderTime > level.time)
 	{
-		goto checkprint;
+		return;
+		// goto checkprint;
 	}
 
 	gWPRenderTime = level.time + 100;
@@ -255,12 +206,9 @@ void BotWaypointRender(void)
 			
 			n = 0;
 
-			while (n < gWPArray[i]->neighbornum)
+			while (n < gWPArray[i]->connectionsCount)
 			{
-				if (gWPArray[i]->neighbors[n].forceJumpTo && gWPArray[gWPArray[i]->neighbors[n].num])
-				{
-					G_TestLine(gWPArray[i]->origin, gWPArray[gWPArray[i]->neighbors[n].num]->origin, 0x0000ff, 5000);
-				}
+				G_TestLine(gWPArray[i]->origin, gWPArray[gWPArray[i]->connections[n].index]->origin, 0x0000ff, 5000);
 				n++;
 			}
 
@@ -284,6 +232,8 @@ void BotWaypointRender(void)
 		gWPRenderTime = level.time + 1500; //wait a bit after we finish doing the whole trail
 		gWPRenderedFrame = 0;
 	}
+
+	return;
 
 checkprint:
 
@@ -365,6 +315,12 @@ void TransferWPData(int from, int to)
 
 void CreateNewWP(vec3_t origin, int flags)
 {
+	wpobject_t* neighbor;
+	wpconnection_t connectionToNeighbor, connectionToNew;
+	vec3_t difference;
+	float distance;
+	int i, previousIndex;
+
 	if (gWPNum >= MAX_WPARRAY_SIZE)
 	{
 		G_Printf(S_COLOR_YELLOW "Warning: Waypoint limit hit (%i)\n", MAX_WPARRAY_SIZE);
@@ -390,6 +346,30 @@ void CreateNewWP(vec3_t origin, int flags)
 	gWPArray[gWPNum]->index = gWPNum;
 	gWPArray[gWPNum]->inuse = 1;
 	VectorCopy(origin, gWPArray[gWPNum]->origin);
+	gWPArray[gWPNum]->connectionsCount = 0;
+
+	if (gWPNum > 0) {
+		previousIndex = gWPNum - 1;
+
+		neighbor = gWPArray[previousIndex];
+		VectorSubtract(neighbor->origin, gWPArray[gWPNum]->origin, difference);
+		distance = VectorLength(difference);
+
+		connectionToNeighbor.index = previousIndex;
+		connectionToNeighbor.distance = distance;
+
+		gWPArray[gWPNum]->connections[0] = connectionToNeighbor;
+		gWPArray[gWPNum]->connectionsCount++;
+
+		if (neighbor->connectionsCount < MAX_WP_CONNECTION_SIZE) {
+			connectionToNew.index = gWPNum;
+			connectionToNew.distance = distance;
+
+			neighbor->connections[neighbor->connectionsCount] = connectionToNew;
+			neighbor->connectionsCount++;
+		}
+	}
+
 	gWPNum++;
 }
 
@@ -422,56 +402,104 @@ void CreateNewWP_FromObject(wpobject_t *wp)
 	gWPArray[gWPNum]->inuse = 1;
 	VectorCopy(wp->origin, gWPArray[gWPNum]->origin);
 	gWPArray[gWPNum]->neighbornum = wp->neighbornum;
+	gWPArray[gWPNum]->connectionsCount = wp->connectionsCount;
 
-	i = wp->neighbornum;
+	i = wp->connectionsCount;
 
 	while (i >= 0)
 	{
-		gWPArray[gWPNum]->neighbors[i].num = wp->neighbors[i].num;
-		gWPArray[gWPNum]->neighbors[i].forceJumpTo = wp->neighbors[i].forceJumpTo;
+		gWPArray[gWPNum]->connections[i].index = wp->connections[i].index;
 
 		i--;
-	}
-
-	if (gWPArray[gWPNum]->flags & WPFLAG_RED_FLAG)
-	{
-		flagRed = gWPArray[gWPNum];
-		oFlagRed = flagRed;
-	}
-	else if (gWPArray[gWPNum]->flags & WPFLAG_BLUE_FLAG)
-	{
-		flagBlue = gWPArray[gWPNum];
-		oFlagBlue = flagBlue;
 	}
 
 	gWPNum++;
 }
 
-void RemoveWP(void)
+void RemoveWP(vec3_t origin)
 {
+	int i, j, connectedIndex;
+	int closestIndex = -1;
+	vec3_t difference;
+	float distance;
+	float closestDistance = -1.0;
+	qboolean found = qfalse;
+
 	if (gWPNum <= 0)
 	{
 		return;
 	}
 
+	for (i = 0; i < gWPNum; i++) {
+		VectorSubtract(gWPArray[i]->origin, origin, difference);
+		distance = VectorLength(difference);
+
+		if (distance <= 64.0f)
+		{
+			if (closestIndex == -1 || distance < closestDistance)
+			{
+				closestIndex = i;
+				closestDistance = distance;
+			}
+		}
+	}
+
+	if (closestIndex < 0 || closestIndex > gWPNum) { return; }
+
+	for (i = 0; i < gWPArray[closestIndex]->connectionsCount; i++)
+	{
+		connectedIndex = gWPArray[closestIndex]->connections[i].index;
+
+		if (gWPArray[connectedIndex]->connectionsCount == 1)
+		{
+			found = qtrue;
+		}
+		else
+		{
+			for (j = 0; j < gWPArray[connectedIndex]->connectionsCount - 1; j++)
+			{
+				if (!found && gWPArray[connectedIndex]->connections[j].index == closestIndex)
+				{
+					found = qtrue;
+				}
+
+				gWPArray[connectedIndex]->connections[j] = gWPArray[connectedIndex]->connections[j + 1];
+			}
+		}
+
+		if (found)
+		{
+			found = qfalse;
+			gWPArray[connectedIndex]->connectionsCount--;
+		}
+	}
+
+	B_Free(gWPArray[i]);
+
+	for (i = closestIndex; i < gWPNum - 1; i++)
+	{
+		gWPArray[i] = gWPArray[i + 1];
+	}
+
+	gWPArray[gWPNum - 1] = NULL;
+
 	gWPNum--;
 
-	if (!gWPArray[gWPNum] || !gWPArray[gWPNum]->inuse)
+	for (i = 0; i < gWPNum; i++)
 	{
-		return;
-	}
+		gWPArray[i]->index = i;
 
-	//B_Free((wpobject_t *)gWPArray[gWPNum]);
-	if (gWPArray[gWPNum])
-	{
-		memset( gWPArray[gWPNum], 0, sizeof(*gWPArray[gWPNum]) );
-	}
-
-	//gWPArray[gWPNum] = NULL;
-
-	if (gWPArray[gWPNum])
-	{
-		gWPArray[gWPNum]->inuse = 0;
+		for (j = 0; j < gWPArray[i]->connectionsCount; j++)
+		{
+			if (gWPArray[i]->connections[j].index > closestIndex) 
+			{
+				gWPArray[i]->connections[j].index--;
+			}
+			else 
+			{
+				gWPArray[i]->connections[j].index++;
+			}
+		}
 	}
 }
 
@@ -788,6 +816,7 @@ int CanGetToVectorTravel(vec3_t org1, vec3_t org2, vec3_t mins, vec3_t maxs)
 	return 1;
 }
 
+// PowTecH - Note: Stuff about collisions in here - will need that for placing nodes 
 int ConnectTrail(int startindex, int endindex)
 {
 	int foundit;
@@ -1353,87 +1382,6 @@ void CalculatePaths(void)
 	}
 }
 
-gentity_t *GetObjectThatTargets(gentity_t *ent)
-{
-	gentity_t *next = NULL;
-
-	if (!ent->targetname)
-	{
-		return NULL;
-	}
-
-	next = G_Find( next, FOFS(target), ent->targetname );
-
-	if (next)
-	{
-		return next;
-	}
-
-	return NULL;
-}
-
-void CalculateSagaGoals(void)
-{
-	int i = 0;
-	int looptracker = 0;
-	int wpindex = 0;
-	vec3_t dif;
-	gentity_t *ent;
-	gentity_t *tent = NULL, *t2ent = NULL;
-
-	while (i < MAX_GENTITIES)
-	{
-		ent = &g_entities[i];
-
-		tent = NULL;
-
-		if (ent && ent->classname && strcmp(ent->classname, "info_saga_objective") == 0)
-		{
-			tent = ent;
-			t2ent = GetObjectThatTargets(tent);
-			looptracker = 0;
-
-			while (t2ent && looptracker < 2048)
-			{ //looptracker keeps us from getting stuck in case something is set up weird on this map
-				tent = t2ent;
-				t2ent = GetObjectThatTargets(tent);
-				looptracker++;
-			}
-
-			if (looptracker >= 2048)
-			{ //something unpleasent has happened
-				tent = NULL;
-				break;
-			}
-		}
-
-		if (tent && ent && tent != ent)
-		{ //tent should now be the object attached to the mission objective
-			dif[0] = (tent->r.absmax[0]+tent->r.absmin[0])/2;
-			dif[1] = (tent->r.absmax[1]+tent->r.absmin[1])/2;
-			dif[2] = (tent->r.absmax[2]+tent->r.absmin[2])/2;
-
-			wpindex = GetNearestVisibleWP(dif, tent->s.number);
-
-			if (wpindex != -1 && gWPArray[wpindex] && gWPArray[wpindex]->inuse)
-			{ //found the waypoint nearest the center of this objective-related object
-				if (ent->side == SAGATEAM_IMPERIAL)
-				{
-					gWPArray[wpindex]->flags |= WPFLAG_SAGA_IMPERIALOBJ;
-				}
-				else
-				{
-					gWPArray[wpindex]->flags |= WPFLAG_SAGA_REBELOBJ;
-				}
-
-				gWPArray[wpindex]->associated_entity = tent->s.number;
-			}
-		}
-
-		i++;
-	}
-}
-
 float botGlobalNavWeaponWeights[WP_NUM_WEAPONS] =
 {
 	0,//WP_NONE,
@@ -1653,7 +1601,6 @@ int LoadPathData(const char *filename)
 	wpobject_t thiswp;
 	int len;
 	int i, i_cv;
-	int nei_num;
 
 	i = 0;
 	i_cv = 0;
@@ -1683,36 +1630,8 @@ int LoadPathData(const char *filename)
 
 	trap_FS_Read(fileString, len, f);
 
-	if (fileString[i] == 'l')
-	{ //contains a "levelflags" entry..
-		char readLFlags[64];
-		i_cv = 0;
-
-		while (fileString[i] != ' ')
-		{
-			i++;
-		}
-		i++;
-		while (fileString[i] != '\n')
-		{
-			readLFlags[i_cv] = fileString[i];
-			i_cv++;
-			i++;
-		}
-		readLFlags[i_cv] = 0;
-		i++;
-
-		gLevelFlags = atoi(readLFlags);
-	}
-	else
-	{
-		gLevelFlags = 0;
-	}
-
 	while (i < len)
 	{
-		i_cv = 0;
-
 		thiswp.index = 0;
 		thiswp.flags = 0;
 		thiswp.inuse = 0;
@@ -1724,15 +1643,7 @@ int LoadPathData(const char *filename)
 		thiswp.associated_entity = ENTITYNUM_NONE;
 		thiswp.forceJumpTo = 0;
 		thiswp.disttonext = 0;
-		nei_num = 0;
-
-		while (nei_num < MAX_NEIGHBOR_SIZE)
-		{
-			thiswp.neighbors[nei_num].num = 0;
-			thiswp.neighbors[nei_num].forceJumpTo = 0;
-
-			nei_num++;
-		}
+		thiswp.connectionsCount = 0;
 		
 		while (fileString[i] != ' ')
 		{
@@ -1745,7 +1656,8 @@ int LoadPathData(const char *filename)
 		thiswp.index = atoi(currentVar);
 
 		i_cv = 0;
-		i++;
+		i += 2;
+		memset(currentVar, '\0', sizeof(currentVar));
 
 		while (fileString[i] != ' ')
 		{
@@ -1755,10 +1667,11 @@ int LoadPathData(const char *filename)
 		}
 		currentVar[i_cv] = '\0';
 
-		thiswp.flags = atoi(currentVar);
+		thiswp.origin[0] = (float)atoi(currentVar);
 
 		i_cv = 0;
 		i++;
+		memset(currentVar, '\0', sizeof(currentVar));
 
 		while (fileString[i] != ' ')
 		{
@@ -1768,37 +1681,11 @@ int LoadPathData(const char *filename)
 		}
 		currentVar[i_cv] = '\0';
 
-		thiswp.weight = atof(currentVar);
+		thiswp.origin[1] = (float)atoi(currentVar);
 
 		i_cv = 0;
 		i++;
-		i++;
-
-		while (fileString[i] != ' ')
-		{
-			currentVar[i_cv] = fileString[i];
-			i_cv++;
-			i++;
-		}
-		currentVar[i_cv] = '\0';
-
-		thiswp.origin[0] = atof(currentVar);
-
-		i_cv = 0;
-		i++;
-
-		while (fileString[i] != ' ')
-		{
-			currentVar[i_cv] = fileString[i];
-			i_cv++;
-			i++;
-		}
-		currentVar[i_cv] = '\0';
-
-		thiswp.origin[1] = atof(currentVar);
-
-		i_cv = 0;
-		i++;
+		memset(currentVar, '\0', sizeof(currentVar));
 
 		while (fileString[i] != ')')
 		{
@@ -1808,14 +1695,15 @@ int LoadPathData(const char *filename)
 		}
 		currentVar[i_cv] = '\0';
 
-		thiswp.origin[2] = atof(currentVar);
+		thiswp.origin[2] = (float)atoi(currentVar);
 
-		i += 4;
+		i += 3;
 
-		while (fileString[i] != '}')
+		while (fileString[i] != ']')
 		{
 			i_cv = 0;
-			while (fileString[i] != ' ' && fileString[i] != '-')
+			memset(currentVar, '\0', sizeof(currentVar));
+			while (fileString[i] != ',' && fileString[i] != ']')
 			{
 				currentVar[i_cv] = fileString[i];
 				i_cv++;
@@ -1823,49 +1711,20 @@ int LoadPathData(const char *filename)
 			}
 			currentVar[i_cv] = '\0';
 
-			thiswp.neighbors[thiswp.neighbornum].num = atoi(currentVar);
+			if (currentVar[0] == '\0') { break; }
 
-			if (fileString[i] == '-')
-			{
-				i_cv = 0;
+			thiswp.connections[thiswp.connectionsCount].index = atoi(currentVar);
+			thiswp.connectionsCount++;
+
+			if (fileString[i] != ']') {
 				i++;
-
-				while (fileString[i] != ' ')
-				{
-					currentVar[i_cv] = fileString[i];
-					i_cv++;
-					i++;
-				}
-				currentVar[i_cv] = '\0';
-
-				thiswp.neighbors[thiswp.neighbornum].forceJumpTo = 999; //atoi(currentVar); //FJSR
 			}
-			else
-			{
-				thiswp.neighbors[thiswp.neighbornum].forceJumpTo = 0;
-			}
-
-			thiswp.neighbornum++;
-
-			i++;
 		}
-
-		i_cv = 0;
-		i++;
-		i++;
-
-		while (fileString[i] != '\n')
-		{
-			currentVar[i_cv] = fileString[i];
-			i_cv++;
-			i++;
-		}
-		currentVar[i_cv] = '\0';
-
-		thiswp.disttonext = atof(currentVar);
 
 		CreateNewWP_FromObject(&thiswp);
-		i++;
+		i += 2;
+		i_cv = 0;
+		memset(currentVar, '\0', sizeof(currentVar));
 	}
 
 	B_TempFree(524288); //fileString
@@ -1873,16 +1732,11 @@ int LoadPathData(const char *filename)
 
 	trap_FS_FCloseFile(f);
 
-	if (g_gametype.integer == GT_SAGA)
-	{
-		CalculateSagaGoals();
-	}
-
-	CalculateWeightGoals();
+	// CalculateWeightGoals();
 	//calculate weights for idle activity goals when
 	//the bot has absolutely nothing else to do
 
-	CalculateJumpRoutes();
+	// CalculateJumpRoutes();
 	//Look at jump points and mark them as requiring
 	//force jumping as needed
 
@@ -2014,8 +1868,6 @@ int SavePathData(const char *filename)
 	char *fileString;
 	char *storeString;
 	char *routePath;
-	vec3_t a;
-	float flLen;
 	int i, n;
 
 	fileString = NULL;
@@ -2040,6 +1892,7 @@ int SavePathData(const char *filename)
 		return 0;
 	}
 
+	/*
 	if (!RepairPaths()) //check if we can see all waypoints from the last. If not, try to branch over.
 	{
 		trap_FS_FCloseFile(f);
@@ -2049,77 +1902,35 @@ int SavePathData(const char *filename)
 	CalculatePaths(); //make everything nice and connected before saving
 
 	FlagObjects(); //currently only used for flagging waypoints nearest CTF flags
+	*/
 
 	fileString = (char *)B_TempAlloc(524288);
 	storeString = (char *)B_TempAlloc(4096);
 
-	Com_sprintf(fileString, 524288, "%i %i %f (%f %f %f) { ", gWPArray[i]->index, gWPArray[i]->flags, gWPArray[i]->weight, gWPArray[i]->origin[0], gWPArray[i]->origin[1], gWPArray[i]->origin[2]);
-
-	n = 0;
-
-	while (n < gWPArray[i]->neighbornum)
-	{
-		if (gWPArray[i]->neighbors[n].forceJumpTo)
-		{
-			Com_sprintf(storeString, 4096, "%s%i-%i ", storeString, gWPArray[i]->neighbors[n].num, gWPArray[i]->neighbors[n].forceJumpTo);
-		}
-		else
-		{
-			Com_sprintf(storeString, 4096, "%s%i ", storeString, gWPArray[i]->neighbors[n].num);
-		}
-		n++;
-	}
-
-	if (gWPArray[i+1] && gWPArray[i+1]->inuse && gWPArray[i+1]->index)
-	{
-		VectorSubtract(gWPArray[i]->origin, gWPArray[i+1]->origin, a);
-		flLen = VectorLength(a);
-	}
-	else
-	{
-		flLen = 0;
-	}
-
-	gWPArray[i]->disttonext = flLen;
-
-	Com_sprintf(fileString, 524288, "%s} %f\n", fileString, flLen);
-
-	i++;
+	Com_sprintf(fileString, 524288, "");
 
 	while (i < gWPNum)
 	{
-		if ( !gWPArray[i] ) continue; // Not sure if this can happen, but let's be safe...
-		//sprintf(fileString, "%s%i %i %f (%f %f %f) { ", fileString, gWPArray[i]->index, gWPArray[i]->flags, gWPArray[i]->weight, gWPArray[i]->origin[0], gWPArray[i]->origin[1], gWPArray[i]->origin[2]);
-		Com_sprintf(storeString, 4096, "%i %i %f (%f %f %f) { ", gWPArray[i]->index, gWPArray[i]->flags, gWPArray[i]->weight, gWPArray[i]->origin[0], gWPArray[i]->origin[1], gWPArray[i]->origin[2]);
+		if ( !gWPArray[i] ) continue;
+		Com_sprintf(storeString, 4096, "%i (%i %i %i) [", gWPArray[i]->index, (int)gWPArray[i]->origin[0], (int)gWPArray[i]->origin[1], (int)gWPArray[i]->origin[2]);
 
 		n = 0;
 
-		while (n < gWPArray[i]->neighbornum)
+		while (n < gWPArray[i]->connectionsCount)
 		{
-			if (gWPArray[i]->neighbors[n].forceJumpTo)
+			if ((n + 1) >= gWPArray[i]->connectionsCount)
 			{
-				Com_sprintf(storeString, 4096, "%s%i-%i ", storeString, gWPArray[i]->neighbors[n].num, gWPArray[i]->neighbors[n].forceJumpTo);
+				Com_sprintf(storeString, 4096, "%s%i", storeString, gWPArray[i]->connections[n].index);
 			}
 			else
 			{
-				Com_sprintf(storeString, 4096, "%s%i ", storeString, gWPArray[i]->neighbors[n].num);
+				Com_sprintf(storeString, 4096, "%s%i,", storeString, gWPArray[i]->connections[n].index);
 			}
+
 			n++;
 		}
 
-		if (gWPArray[i+1] && gWPArray[i+1]->inuse && gWPArray[i+1]->index)
-		{
-			VectorSubtract(gWPArray[i]->origin, gWPArray[i+1]->origin, a);
-			flLen = VectorLength(a);
-		}
-		else
-		{
-			flLen = 0;
-		}
-
-		gWPArray[i]->disttonext = flLen;
-
-		Com_sprintf(storeString, 4096, "%s} %f\n", storeString, flLen);
+		Com_sprintf(storeString, 4096, "%s]\n", storeString);
 
 		strcat(fileString, storeString);
 
@@ -2341,7 +2152,7 @@ int AcceptBotCommand(char *cmd, gentity_t *pl)
 		}
 		else
 		{
-			RemoveWP();
+			RemoveWP(pl->client->ps.origin);
 		}
 
 		return 1;
