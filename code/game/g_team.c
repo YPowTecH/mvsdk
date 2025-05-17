@@ -182,43 +182,41 @@ void AddTeamScore(vec3_t origin, int team, int score) {
 
 /*
 ==============
-OnSameTeam
+OnSameTeam - PowTecH Refactored
 ==============
 */
 qboolean OnSameTeam( gentity_t *ent1, gentity_t *ent2 ) {
-	if ( !ent1->client || !ent2->client ) {
-		return qfalse;
+	qboolean ent1IsBot;
+	qboolean ent2IsBot;
+
+	if (!ent1 || !ent2 || !ent1->client || !ent2->client) {
+		return qfalse; // Invalid entities or not clients
 	}
 
-	if (g_gametype.integer == GT_SINGLE_PLAYER)
-	{
-		qboolean ent1IsBot = qfalse;
-		qboolean ent2IsBot = qfalse;
-
-		if (ent1->r.svFlags & SVF_BOT)
-		{
-			ent1IsBot = qtrue;
-		}
-		if (ent2->r.svFlags & SVF_BOT)
-		{
-			ent2IsBot = qtrue;
-		}
-
-		if ((ent1IsBot && ent2IsBot) || (!ent1IsBot && !ent2IsBot))
-		{
-			return qtrue;
-		}
-		return qfalse;
-	}
-
-	if ( g_gametype.integer < GT_TEAM ) {
-		return qfalse;
-	}
-
-	if ( ent1->client->sess.sessionTeam == ent2->client->sess.sessionTeam ) {
+	if (ent1 == ent2) { // An entity is always on its own "team" relative to itself
 		return qtrue;
 	}
 
+	// Spectators are not on functional teams for targeting
+	if (ent1->client->sess.sessionTeam == TEAM_SPECTATOR || ent2->client->sess.sessionTeam == TEAM_SPECTATOR) {
+		return qfalse;
+	}
+
+	// Determine if entities are bots or humans
+	ent1IsBot = (ent1->r.svFlags & SVF_BOT);
+	ent2IsBot = (ent2->r.svFlags & SVF_BOT);
+
+	// If both are bots, they are considered on the same team for targeting.
+	if (ent1IsBot && ent2IsBot) {
+		return qtrue;
+	}
+
+	// If both are humans, they are considered on the same team for targeting.
+	if (!ent1IsBot && !ent2IsBot) {
+		return qtrue;
+	}
+
+	// Otherwise (one is a bot, one is a human), they are not on the same team.
 	return qfalse;
 }
 

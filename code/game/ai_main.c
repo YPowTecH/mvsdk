@@ -87,25 +87,32 @@ gentity_t *droppedRedFlag;
 gentity_t *eFlagBlue;
 gentity_t *droppedBlueFlag;
 
-// PowTecH - Definitions
-#define MAX_POINTS 100
-#define EPSILON 0.0001f
-#define FLT_MAX_LITE 9000
+// PowTecH
+#define IS_VALID_ENEMY(enemy_ptr) \
+    ((enemy_ptr) && \
+     (enemy_ptr)->client && \
+     (enemy_ptr)->client->pers.connected == CON_CONNECTED && \
+     (enemy_ptr)->client->sess.sessionTeam != TEAM_SPECTATOR)
 
-// PowTecH - Structs
-typedef struct Node {
-	vec3_t position;
-	float g; // Cost from start
-	float h; // Heuristic to goal
-	float f; // Total cost (g + h)
-	struct Node* parent;
-} Node;
-//
+#define ASTAR_INFINITE_COST 999999.0f
 
-// PowTecH - Global Properties
-Node nodes[MAX_POINTS];
-int nodesCount = 0;
-qboolean onlyOnce = qfalse;
+typedef struct astar_node_data_s {
+	int parentWaypointIndex;    // Index of the waypoint this node came from
+	float gCost;                // Cost from start to this waypoint
+	float hCost;                // Heuristic cost from this waypoint to goal
+	float fCost;                // gCost + hCost
+	qboolean inOpenSet;         // True if this waypoint is in the open set
+	qboolean inClosedSet;       // True if this waypoint is in the closed set
+} astar_node_data_t;
+
+
+// This array will hold temporary A* data for each waypoint during a pathfind.
+// Ensure MAX_WAYPOINTS is correctly defined based on your map's capabilities.
+static astar_node_data_t astar_node_workspace[MAX_WPARRAY_SIZE]; // Corrected variable name
+
+// Open set (list of waypoint indices to be evaluated)
+static int openSet[MAX_WPARRAY_SIZE];
+static int openSetCount;
 //
 
 char *ctfStateNames[] = {
@@ -1455,11 +1462,6 @@ void WPTouchRoutine(bot_state_t *bs)
 			CheckForShorterRoutes(bs, bs->wpCurrent->index);
 		}
 	}
-}
-
-void MoveTowardIdealAngles(bot_state_t *bs)
-{
-	VectorCopy(bs->goalAngles, bs->ideal_viewangles);
 }
      
 #define BOT_STRAFE_AVOIDANCE
@@ -5283,162 +5285,18 @@ int BotWeaponBlockable(int weapon)
 void Cmd_EngageDuel_f(gentity_t *ent);
 void Cmd_ToggleSaber_f(gentity_t *ent);
 
-// PowTecH - Start Point
-static qboolean TStar(wpobject_t* previous, wpobject_t* current, wpobject_t* goal, int* results[], int* resultsCount) {
-	// Deep copy
-	wpconnection_t connections[MAX_WP_CONNECTION_SIZE];
-	int connectionsCount = 0;
-
-	// Shortest path
-	vec3_t difference = { 0.0f, 0.0f, 0.0f };
-	float distance = -1.0f;
-	int shortestI = -1;
-	float shortestDistance = -1.0f;
-	int shortestIndex = -1;
-
-	// Helper
-	int iteration = 0;
-	qboolean result = qfalse;
-	int i = 0;
-	int currentIndex = -1;
-	vec3_t currentOrigin = { 0.0f, 0.0f, 0.0f };
-	int currentConnectionsCount = 0;
-
-	iteration = (*resultsCount);
-	G_Printf(S_COLOR_CYAN "1. %i - %i\n", iteration, (*resultsCount));
-	(*resultsCount)++;
-	G_Printf(S_COLOR_CYAN "2. %i\n", (*resultsCount));
-	if (previous) {
-		G_Printf(S_COLOR_CYAN "3. p:%i c:%i g:%i \n", previous->index, current->index, goal->index);
-	}
-	else {
-		G_Printf(S_COLOR_CYAN "3. p:NULL c:%i g:%i \n", current->index, goal->index);
-	}
-
-	results[iteration] = &current->index;
-
-	if (!goal) {
-		G_Printf(S_COLOR_CYAN "4. No Goal\n");
-		return qfalse;
-	}
-	
-	if (VectorCompare(current->origin, goal->origin)) {
-		G_Printf(S_COLOR_CYAN "4. Reached Goal\n");
-		return qtrue;
-	}
-
-	for (i = 0; i < current->connectionsCount; i++) {
-		if (!previous) {
-			G_Printf(S_COLOR_CYAN "- %i\n", current->connections[i].index);
-			connections[i] = current->connections[i];
-			connectionsCount++;
-			continue;
-		}
-
-		G_Printf(S_COLOR_CYAN "- %i )( %i\n", current->connections[i].index, previous->index);
-		if (current->connections[i].index != previous->index) {
-			connections[connectionsCount] = current->connections[i];
-			G_Printf(S_COLOR_CYAN "+ %i )( %i )( %i\n", current->connections[i].index, previous->index, connections[connectionsCount].index);
-			connectionsCount++;
-		}
-	}
-
-	if (connectionsCount <= 0) {
-		G_Printf(S_COLOR_CYAN "4. No more nodes\n");
-		return qfalse;
-	}
-	G_Printf(S_COLOR_CYAN "4. deep copy [%i] %i\n", connectionsCount, connections[0].index);
-
-	while (qtrue) {
-		for (i = 0; i < connectionsCount; i++) {
-			currentIndex = connections[i].index;
-			VectorCopy(gWPArray[currentIndex]->origin, currentOrigin);
-			VectorSubtract(goal->origin, currentOrigin, difference);
-			distance = VectorLength(difference);
-
-			if (shortestDistance == -1.0f || distance < shortestDistance) {
-				shortestI = i;
-				shortestDistance = distance;
-				shortestIndex = currentIndex;
-			}
-		}
-
-		G_Printf(S_COLOR_CYAN "5. i:%i distance:%f index:%i \n", shortestI, shortestDistance, shortestIndex);
-
-		if (shortestDistance == -1.0f) {
-			result = qfalse;
-			break;
-		}
-
-		if (shortestI == -1) {
-			result = qfalse;
-			break;
-		}
-
-		G_Printf(S_COLOR_CYAN "6. p:%i c:%i g:%i\n", current->index, gWPArray[shortestIndex]->index, goal->index);
-		result = TStar(current, gWPArray[shortestIndex], goal, results, resultsCount);
-		G_Printf(S_COLOR_CYAN "7. r:%i rc:%i\n", result, resultsCount);
-
-		if (result) {
-			break;
-		}
-
-		connectionsCount--;
-		(*resultsCount)--;
-
-		if (connectionsCount <= 0) {
-			result = qfalse;
-			break;
-		}
-
-		for (i = shortestI; i < connectionsCount; i++) {
-			connections[i] = connections[i + 1];
-		}
-
-		shortestI = -1;
-		shortestDistance = -1.0f;
-		shortestIndex = -1;
-	}
-
-	return result;
-}
-
-static void ClosestPlayer(bot_state_t* bs, int* result)
+static void UseInventoryItem(bot_state_t* bs)
 {
-	int i;
-	int wp = -1;
-	gentity_t* ent;
-	vec3_t difference;
-	float distance;
-	float shortestDistance = -1;
-
-	for (i = 0; i < MAX_CLIENTS; i++)
+	if (BotUseInventoryItem(bs))
 	{
-		ent = &g_entities[i];
-
-		if (ent && ent->client && ent->inuse)
+		if (rand() % 10 < 5)
 		{
-			wp = GetNearestVisibleWP(ent->r.currentOrigin, ent->r.ownerNum);
-
-			if (wp == -1) { break; }
-			VectorSubtract(bs->wpCurrent->origin, gWPArray[wp]->origin, difference);
-			distance = VectorLength(difference);
-
-			if (shortestDistance == -1 || distance < shortestDistance)
-			{
-				shortestDistance = distance;
-				(*result) = wp;
-			}
+			trap_EA_Use(bs->client);
 		}
-
-		break;
-	}
-
-	if (shortestDistance <= 64.0f) {
-		(*result) = -1;
 	}
 }
 
+// PowTecH - Start Point
 static qboolean Respawn(bot_state_t* bs)
 {
 	//just spawned in?
@@ -5535,344 +5393,509 @@ static qboolean Respawn(bot_state_t* bs)
 	return qfalse;
 }
 
-static void AimAtEnemy(bot_state_t* bs, float thinktime) {
-	vec3_t a, ang, headlevel, eorg;
-	float bLeadAmount;
-	float mLen;
+static gentity_t* BotFindBestAvailableEnemy(bot_state_t* bs) {
+	gentity_t* ent = NULL;
+	gentity_t* bestEnemy = NULL;
+	int i;
+	gentity_t* self_ent = &g_entities[bs->client];
 
-	if (!bs->currentEnemy || !bs->currentEnemy->client) {
-		bs->lastVisibleEnemyIndex = ENTITYNUM_NONE;
-		VectorCopy(bs->currentEnemy->s.origin, eorg);
-		VectorCopy(bs->currentEnemy->client->ps.origin, headlevel);
-
-		return;
-	}
-
-	VectorCopy(bs->currentEnemy->client->ps.origin, eorg);
-	eorg[2] += bs->currentEnemy->client->ps.viewheight;
-
-	VectorSubtract(eorg, bs->eye, a);
-	bs->frame_Enemy_Len = VectorLength(a);
-
-	if (OrgVisible(bs->eye, eorg, bs->client)) {
-		bs->frame_Enemy_Vis = 1;
-		VectorCopy(eorg, bs->lastEnemySpotted);
-		VectorCopy(bs->origin, bs->hereWhenSpotted);
-		bs->lastVisibleEnemyIndex = bs->currentEnemy->s.number;
-		bs->hitSpotted = 0;
-	} 
-	else {
-		bs->frame_Enemy_Vis = 0;
-	}
-
-	if (bs->frame_Enemy_Vis) {
-		bs->enemySeenTime = level.time + ENEMY_FORGET_MS;
-	}
-
-	if (bs->timeToReact >= level.time || !bs->currentEnemy || bs->enemySeenTime <= level.time + (ENEMY_FORGET_MS - (ENEMY_FORGET_MS * 0.2))) {
-		return;
-	}
-
-	if (bs->frame_Enemy_Vis) {
-		CombatBotAI(bs, thinktime);
-	}
-
-	VectorCopy(bs->currentEnemy->client->ps.origin, headlevel);
-	headlevel[2] += bs->currentEnemy->client->ps.viewheight;
-
-	if (bs->frame_Enemy_Vis) {
-		bLeadAmount = BotWeaponCanLead(bs);
-
-		if ((bs->skills.accuracy / bs->settings.skill) <= 8 && bLeadAmount) {
-			BotAimLeading(bs, headlevel, bLeadAmount);
-		}
-		else {
-			VectorSubtract(headlevel, bs->eye, a);
-			vectoangles(a, ang);
-			VectorCopy(ang, bs->goalAngles);
-		}
-
-		BotAimOffsetGoalAngles(bs);
-
-		return;
-	}
-
-	if (OrgVisible(bs->eye, bs->lastEnemySpotted, -1)) {
-		VectorCopy(bs->lastEnemySpotted, headlevel);
-		VectorSubtract(headlevel, bs->eye, a);
-		vectoangles(a, ang);
-		VectorCopy(ang, bs->goalAngles);
-
-		if (bs->cur_ps.weapon == WP_FLECHETTE &&
-			bs->cur_ps.weaponstate == WEAPON_READY &&
-			bs->currentEnemy && bs->currentEnemy->client)
+	for (i = 0; i < MAX_CLIENTS; i++) {
+		ent = &g_entities[i];
+		if (IS_VALID_ENEMY(ent) &&
+			ent->s.number != bs->client &&
+			!OnSameTeam(ent, self_ent))
 		{
-			mLen = VectorLength(a) > 128;
-			if (mLen > 128 && mLen < 1024) {
-				VectorSubtract(bs->currentEnemy->client->ps.origin, bs->lastEnemySpotted, a);
+			bestEnemy = ent;
+			break;
+		}
+	}
+	return bestEnemy;
+}
 
-				if (VectorLength(a) < 300) {
-					bs->doAltAttack = 1;
+static void SetEnemyTarget(bot_state_t* bs) {
+	if (!IS_VALID_ENEMY(bs->currentEnemy)) {
+		gentity_t* newEnemy = BotFindBestAvailableEnemy(bs);
+		if (newEnemy != bs->currentEnemy) {
+			bs->currentEnemy = newEnemy;
+			bs->wpToGoalCount = 0;
+			bs->currentPathWaypointIndex = 0;
+
+			if (bs->currentEnemy) {
+				bs->frame_Enemy_Vis = 0;
+				bs->lastVisibleEnemyIndex = ENTITYNUM_NONE;
+			}
+		}
+		else if (!newEnemy) {
+			bs->currentEnemy = NULL;
+			bs->wpToGoalCount = 0;
+			bs->currentPathWaypointIndex = 0;
+		}
+	}
+	// If bs->currentEnemy was already valid and connected, it remains the target.
+}
+
+static wpobject_t* GetWaypointByIndex(int index) {
+	// Check index bounds first
+	if (index < 0 || index >= MAX_WPARRAY_SIZE) {
+		return NULL;
+	}
+
+	// Check if the pointer itself is NULL or if the pointed-to object is not in use.
+	if (!gWPArray[index] || !gWPArray[index]->inuse) {
+		return NULL;
+	}
+	return gWPArray[index];
+}
+
+static int GetNearestWaypoint(vec3_t origin, float max_search_dist) {
+	int best_wp_index = -1;
+	float best_dist_sq = max_search_dist * max_search_dist;
+	int i;
+	wpobject_t* wp;
+
+	for (i = 0; i < MAX_WPARRAY_SIZE; i++) { // Use MAX_WPARRAY_SIZE
+		wp = GetWaypointByIndex(i); // This will now use gWPArray internally
+		if (wp) {
+			float dist_sq = DistanceSquared(origin, wp->origin);
+			if (dist_sq < best_dist_sq) {
+				best_dist_sq = dist_sq;
+				best_wp_index = i;
+			}
+		}
+	}
+	return best_wp_index;
+}
+
+static float CalculateHeuristic(int waypointIndexA, int waypointIndexB) {
+	wpobject_t* wpA = GetWaypointByIndex(waypointIndexA);
+	wpobject_t* wpB = GetWaypointByIndex(waypointIndexB);
+	vec3_t diff;
+
+	if (!wpA || !wpB) {
+		return ASTAR_INFINITE_COST;
+	}
+	VectorSubtract(wpB->origin, wpA->origin, diff);
+	return VectorLength(diff);
+}
+
+static qboolean BotPathfindAStar(bot_state_t* bs, int startWaypointIndex, int goalWaypointIndex) {
+	int i;
+	wpobject_t* startNode = GetWaypointByIndex(startWaypointIndex);
+	wpobject_t* goalNode = GetWaypointByIndex(goalWaypointIndex);
+	wpobject_t* currentNodeObj;
+	float tentativeGCost;
+
+	if (!startNode || !goalNode) {
+		bs->wpToGoalCount = 0;
+		return qfalse;
+	}
+
+	// 1. Initialize A* data for all waypoints
+	for (i = 0; i < MAX_WPARRAY_SIZE; i++) {
+		astar_node_workspace[i].gCost = ASTAR_INFINITE_COST;
+		astar_node_workspace[i].fCost = ASTAR_INFINITE_COST;
+		astar_node_workspace[i].hCost = ASTAR_INFINITE_COST;
+		astar_node_workspace[i].parentWaypointIndex = -1;
+		astar_node_workspace[i].inOpenSet = qfalse;
+		astar_node_workspace[i].inClosedSet = qfalse;
+	}
+
+	openSetCount = 0;
+
+	// 2. Initialize start node
+	astar_node_workspace[startWaypointIndex].gCost = 0;
+	astar_node_workspace[startWaypointIndex].hCost = CalculateHeuristic(startWaypointIndex, goalWaypointIndex);
+	astar_node_workspace[startWaypointIndex].fCost = astar_node_workspace[startWaypointIndex].hCost;
+	openSet[openSetCount++] = startWaypointIndex;
+	astar_node_workspace[startWaypointIndex].inOpenSet = qtrue;
+
+	// 3. Main A* loop
+	while (openSetCount > 0) {
+		// Find node with the lowest F cost in the open set
+		int currentWaypointIndex = -1;
+		float lowestFCost = ASTAR_INFINITE_COST;
+		int openSetNodePos = -1;
+
+		for (i = 0; i < openSetCount; i++) {
+			int nodeIndex = openSet[i];
+			if (astar_node_workspace[nodeIndex].fCost < lowestFCost) {
+				lowestFCost = astar_node_workspace[nodeIndex].fCost;
+				currentWaypointIndex = nodeIndex;
+				openSetNodePos = i;
+			}
+		}
+
+		if (currentWaypointIndex == -1) {
+			bs->wpToGoalCount = 0;
+			return qfalse;
+		}
+
+		// If current is the goal, path found
+		if (currentWaypointIndex == goalWaypointIndex) {
+			// Reconstruct path
+			int pathIndex = 0;
+			int tempPath[MAX_WPARRAY_SIZE];
+			int curr = goalWaypointIndex;
+			while (curr != -1 && pathIndex < MAX_WPARRAY_SIZE) {
+				tempPath[pathIndex++] = curr;
+				curr = astar_node_workspace[curr].parentWaypointIndex;
+			}
+
+			// Reverse path and store in bs->wpToGoal
+			bs->wpToGoalCount = 0;
+			for (i = pathIndex - 1; i >= 0; i--) {
+				if (bs->wpToGoalCount < MAX_WPARRAY_SIZE) {
+					bs->wpToGoal[bs->wpToGoalCount++] = tempPath[i];
+				}
+				else {
+					// path too long
+					break;
+				}
+			}
+			bs->currentPathWaypointIndex = 0;
+			return qtrue;
+		}
+
+		// Move current node from open set to closed set
+		openSet[openSetNodePos] = openSet[--openSetCount];
+		astar_node_workspace[currentWaypointIndex].inOpenSet = qfalse;
+		astar_node_workspace[currentWaypointIndex].inClosedSet = qtrue;
+
+		// Process neighbors
+		currentNodeObj = GetWaypointByIndex(currentWaypointIndex);
+		if (!currentNodeObj) continue;
+
+		for (i = 0; i < currentNodeObj->connectionsCount; i++) {
+			wpconnection_t* neighborConn = &currentNodeObj->connections[i];
+			int neighborIndex = neighborConn->index;
+			wpobject_t* neighborNodeObj = GetWaypointByIndex(neighborIndex);
+
+			if (!neighborNodeObj || !neighborNodeObj->inuse) continue;
+			if (astar_node_workspace[neighborIndex].inClosedSet) continue;
+
+			tentativeGCost = astar_node_workspace[currentWaypointIndex].gCost + neighborConn->distance;
+
+			if (tentativeGCost < astar_node_workspace[neighborIndex].gCost) {
+				astar_node_workspace[neighborIndex].parentWaypointIndex = currentWaypointIndex;
+				astar_node_workspace[neighborIndex].gCost = tentativeGCost;
+				astar_node_workspace[neighborIndex].hCost = CalculateHeuristic(neighborIndex, goalWaypointIndex);
+				astar_node_workspace[neighborIndex].fCost = astar_node_workspace[neighborIndex].gCost + astar_node_workspace[neighborIndex].hCost;
+
+				if (!astar_node_workspace[neighborIndex].inOpenSet) {
+					if (openSetCount < MAX_WPARRAY_SIZE) { // Check against MAX_WPARRAY_SIZE for openSet capacity
+						openSet[openSetCount++] = neighborIndex;
+						astar_node_workspace[neighborIndex].inOpenSet = qtrue;
+					}
 				}
 			}
 		}
 	}
+
+	bs->wpToGoalCount = 0;
+	return qfalse;
 }
 
-static void AttackEnemy(bot_state_t* bs) {
-	vec3_t difference;
+static void Movement(bot_state_t* bs) {
+	wpobject_t* nextWp = NULL;
 
-	VectorSubtract(bs->currentEnemy->client->ps.origin, bs->eye, difference);
-	vectoangles(difference, difference);
+	if (bs->beStill > level.time) {
+		trap_EA_Move(bs->client, vec3_origin, 0); // Explicitly stop movement
+		VectorClear(bs->goalMovedir);
+		return;
+	}
 
-	if (bs->saberPowerTime < level.time)
-	{ //Don't just use strong attacks constantly, switch around a bit
-		if (Q_irand(1, 10) <= 5)
-		{
-			bs->saberPower = qtrue;
+	// --- Path Recalculation Logic ---
+	if (IS_VALID_ENEMY(bs->currentEnemy)) {
+		qboolean needsPathRecalc = qfalse;
+		if (bs->wpToGoalCount == 0) {
+			needsPathRecalc = qtrue;
 		}
-		else
-		{
-			bs->saberPower = qfalse;
+		else {
+			if (bs->frame_Enemy_Len > 256 && !bs->frame_Enemy_Vis) {
+				wpobject_t* lastPathWp = GetWaypointByIndex(bs->wpToGoal[bs->wpToGoalCount - 1]);
+				if (!lastPathWp || DistanceSquared(lastPathWp->origin, bs->currentEnemy->r.currentOrigin) > 400 * 400) {
+					needsPathRecalc = qtrue;
+				}
+			}
 		}
 
-		bs->saberPowerTime = level.time + Q_irand(3000, 15000);
-	}
+		if (needsPathRecalc) {
+			int startWpIndex = GetNearestWaypoint(bs->origin, 200.0f);
+			int goalWpIndex = GetNearestWaypoint(bs->currentEnemy->r.currentOrigin, 200.0f);
 
-	if (bs->currentEnemy->health > 75 && g_entities[bs->client].client->ps.fd.forcePowerLevel[FP_SABERATTACK] > 2)
-	{
-		if (g_entities[bs->client].client->ps.fd.saberAnimLevel != FORCE_LEVEL_3 && bs->saberPower)
-		{ //if we are up against someone with a lot of health and we have a strong attack available, then h4q them
-			Cmd_SaberAttackCycle_f(&g_entities[bs->client]);
-		}
-	}
-	else if (bs->currentEnemy->health > 40 && g_entities[bs->client].client->ps.fd.forcePowerLevel[FP_SABERATTACK] > 1)
-	{
-		if (g_entities[bs->client].client->ps.fd.saberAnimLevel != FORCE_LEVEL_2)
-		{ //they're down on health a little, use level 2 if we can
-			Cmd_SaberAttackCycle_f(&g_entities[bs->client]);
-		}
-	}
-	else
-	{
-		if (g_entities[bs->client].client->ps.fd.saberAnimLevel != FORCE_LEVEL_1)
-		{ //they've gone below 40 health, go at them with quick attacks
-			Cmd_SaberAttackCycle_f(&g_entities[bs->client]);
-		}
-	}
-
-	if (bs->frame_Enemy_Len <= SABER_ATTACK_RANGE)
-	{
-		bs->doAttack = 1;
-
-		SaberCombatHandling(bs);
-
-		//	if(PrimFiring(bs))
-		//	{
-		//		KeepPrimFromFiring(bs);
-		//	}
-
-		// if (bs->frame_Enemy_Len < 80)
-		// {
-		// 	meleestrafe = 1;
-		// }
-	}
-	else {
-		bs->doAttack = 0;
-	}
-
-	if (bs->doAttack)
-	{
-		trap_EA_Attack(bs->client);
-	}
-}
-
-static void CheckEnemyState(bot_state_t* bs, float thinktime)
-{
-	int i = 0;
-	gentity_t* ent;
-
-	if (!bs->currentEnemy || !bs->currentEnemy->client || bs->currentEnemy->client->pers.connected != CON_CONNECTED) {
-		for (i = 0; i < MAX_CLIENTS; i++) {
-			ent = &g_entities[i];
-
-			// TODO: PowTecH - Currently this just gets the first ent it can find - it should be distance based or something
-			if (ent && ent->client && ent->inuse) {
-				bs->currentEnemy = ent;
-				break;
+			if (startWpIndex != -1 && goalWpIndex != -1 && startWpIndex != goalWpIndex) {
+				BotPathfindAStar(bs, startWpIndex, goalWpIndex);
+			}
+			else {
+				bs->wpToGoalCount = 0;
 			}
 		}
 	}
+	else {
+		bs->wpToGoalCount = 0;
+		bs->currentPathWaypointIndex = 0;
+	}
+
+	// --- Path Following Logic ---
+	if (bs->wpToGoalCount > 0 && bs->currentPathWaypointIndex < bs->wpToGoalCount) {
+		nextWp = GetWaypointByIndex(bs->wpToGoal[bs->currentPathWaypointIndex]);
+		if (nextWp) {
+			VectorCopy(nextWp->origin, bs->goalPosition);
+
+			if (DistanceSquared(bs->origin, bs->goalPosition) < 64 * 64) {
+				bs->currentPathWaypointIndex++;
+				if (bs->currentPathWaypointIndex >= bs->wpToGoalCount) {
+					bs->wpToGoalCount = 0;
+					if (VectorCompare(bs->goalPosition, bs->origin)) {
+						trap_EA_Jump(bs->client);
+					}
+					VectorClear(bs->goalMovedir);
+					return;
+				}
+				if (bs->currentPathWaypointIndex < bs->wpToGoalCount) {
+					nextWp = GetWaypointByIndex(bs->wpToGoal[bs->currentPathWaypointIndex]);
+					if (nextWp) {
+						VectorCopy(nextWp->origin, bs->goalPosition);
+					}
+					else {
+						bs->wpToGoalCount = 0; VectorClear(bs->goalMovedir); return;
+					}
+				}
+				else {
+					bs->wpToGoalCount = 0; VectorClear(bs->goalMovedir); return;
+				}
+			}
+		}
+		else {
+			bs->wpToGoalCount = 0;
+			bs->currentPathWaypointIndex = 0;
+		}
+	}
+	else if (IS_VALID_ENEMY(bs->currentEnemy) && bs->frame_Enemy_Vis && bs->frame_Enemy_Len < 512) {
+		VectorCopy(bs->currentEnemy->r.currentOrigin, bs->goalPosition);
+	}
+	else {
+		VectorClear(bs->goalMovedir);
+		return;
+	}
+
+	// Calculate direction to the current goalPosition
+	if (VectorCompare(bs->goalPosition, bs->origin)) {
+		VectorClear(bs->goalMovedir);
+	}
+	else {
+		VectorSubtract(bs->goalPosition, bs->origin, bs->goalMovedir);
+		VectorNormalize(bs->goalMovedir);
+	}
+
+	// Issue the move command if there's a direction
+	if (VectorLengthSquared(bs->goalMovedir) > 0.1f) {
+		//trap_EA_Move(bs->client, bs->goalMovedir, 300);
+		trap_EA_Move(bs->client, bs->goalMovedir, 5000);
+	}
+}
+
+static void AimAtEnemy(bot_state_t* bs, float thinktime) {
+	vec3_t enemyHeadPos;                // Stores the calculated head position of the enemy
+	vec3_t vecToTarget;                 // Vector from bot's eye to the target
+	vec3_t aimAngles;                   // Temporary storage for calculated aim angles
+	float leadAmount;
+	float skillRatio;
+	float distToLastSpot;
+	vec3_t enemyMovementSinceSpotted;
+
+	// --- 1. Initial Validation: Current Enemy ---
+	// If there's no current enemy, or the enemy is not a client entity or not connected,
+	// reset relevant state and exit. SetEnemyTarget should have handled finding an enemy.
+	if (!IS_VALID_ENEMY(bs->currentEnemy)) {
+		bs->lastVisibleEnemyIndex = ENTITYNUM_NONE;
+		bs->frame_Enemy_Vis = 0; // Mark enemy as not visible
+		// Optionally clear goal angles if no enemy
+		// VectorClear(bs->goalAngles); 
+		return;
+	}
+
+	// --- 2. Calculate Current Enemy Head Position & Distance ---
+	VectorCopy(bs->currentEnemy->client->ps.origin, enemyHeadPos);
+	enemyHeadPos[2] += bs->currentEnemy->client->ps.viewheight;
+	VectorSubtract(enemyHeadPos, bs->eye, vecToTarget);
+	bs->frame_Enemy_Len = VectorLength(vecToTarget);
+
+	// --- 3. Check Current Visibility & Update Bot's Knowledge ---
+	if (OrgVisible(bs->eye, enemyHeadPos, bs->client)) { // bs->client is bot's own entity num for passEntities
+		bs->frame_Enemy_Vis = 1;
+		VectorCopy(enemyHeadPos, bs->lastEnemySpotted);
+		VectorCopy(bs->origin, bs->hereWhenSpotted);
+		bs->lastVisibleEnemyIndex = bs->currentEnemy->s.number;
+		bs->hitSpotted = 0;
+		bs->enemySeenTime = level.time + ENEMY_FORGET_MS;
+	}
+	else {
+		bs->frame_Enemy_Vis = 0;
+	}
+
+	// --- 4. Reaction Time & Engagement Check ---
+	// Check if bot is still in reaction delay or has "forgotten" the enemy.
+	// ENEMY_FORGET_MS * 0.8f means 20% of forget time has passed since last seen.
+	if (bs->timeToReact >= level.time || bs->enemySeenTime <= (level.time + (ENEMY_FORGET_MS * 0.8f))) {
+		// If enemy is not visible, and we are in this state, don't aim at last known spot yet.
+		// If enemy IS visible, CombatBotAI was NOT called in original logic at this stage.
+		// The bot might be aware but not fully reacting/aiming yet.
+		// Consider if goalAngles should be cleared or maintained.
+		return;
+	}
+
+	// --- 5. Active Combat AI & Aiming (If Enemy is Currently Visible) ---
+	if (bs->frame_Enemy_Vis) {
+		CombatBotAI(bs, thinktime); // Perform main combat decision-making
+
+		leadAmount = BotWeaponCanLead(bs);
+		skillRatio = 0.0f;
+
+		if (bs->settings.skill != 0.0f) { // Prevent division by zero
+			skillRatio = bs->skills.accuracy / bs->settings.skill;
+		}
+
+		if (leadAmount > 0.0f && skillRatio <= 8.0f) { // Arbitrary skill threshold
+			BotAimLeading(bs, enemyHeadPos, leadAmount); // This function should set bs->goalAngles
+		}
+		else {
+			// No leading: aim directly. vecToTarget is already (enemyHeadPos - bs->eye).
+			vectoangles(vecToTarget, aimAngles);
+			VectorCopy(aimAngles, bs->goalAngles);
+		}
+		BotAimOffsetGoalAngles(bs); // Apply final aim adjustments
+
+		// PowTecH - Make the bot rotate
+		VectorCopy(bs->goalAngles, bs->ideal_viewangles);
+		return;
+	}
+
+	// --- 6. Aiming at Last Known Position (If Enemy is NOT Currently Visible but remembered) ---
+	// This block executes if enemy not currently visible AND bot is past reaction/partial forgetfulness.
+	if (OrgVisible(bs->eye, bs->lastEnemySpotted, ENTITYNUM_NONE)) { // Check LOS to last spot
+		VectorSubtract(bs->lastEnemySpotted, bs->eye, vecToTarget);
+		vectoangles(vecToTarget, aimAngles);
+		VectorCopy(aimAngles, bs->goalAngles);
+
+		// Specific logic for Flechette gun when aiming at last known position
+		if (bs->cur_ps.weapon == WP_FLECHETTE &&
+			bs->cur_ps.weaponstate == WEAPON_READY &&
+			IS_VALID_ENEMY(bs->currentEnemy)) // Re-check for safety
+		{
+			distToLastSpot = VectorLength(vecToTarget);
+
+			if (distToLastSpot > 128.0f && distToLastSpot < 1024.0f) {
+				VectorSubtract(bs->currentEnemy->client->ps.origin, bs->lastEnemySpotted, enemyMovementSinceSpotted);
+				if (VectorLength(enemyMovementSinceSpotted) < 300.0f) {
+					bs->doAltAttack = qtrue;
+				}
+			}
+		}
+	}
+	else {
+		// Last known spot is not visible, don't aim there.
+		// Optionally, make the bot look forward or in a search pattern.
+		// For now, goalAngles remain as they were (potentially from a previous visible state or cleared).
+	}
+}
+
+static void AttackEnemy(bot_state_t* bs) {
+    gentity_t* bot_entity = &g_entities[bs->client];
+
+    // Ensure currentEnemy and its client are valid before dereferencing.
+    // This is a safeguard, though StandardBotAI checks IS_VALID_ENEMY before calling.
+    if (!IS_VALID_ENEMY(bs->currentEnemy)) {
+        bs->doAttack = qfalse; // Ensure bot doesn't attack if enemy becomes invalid mid-logic
+        return;
+    }
+
+    // Saber power selection: Randomly switch between strong and normal attacks over time.
+    if (bs->saberPowerTime < level.time) {
+        if (Q_irand(1, 10) <= 5) {
+            bs->saberPower = qtrue;
+        } else {
+            bs->saberPower = qfalse;
+        }
+        bs->saberPowerTime = level.time + Q_irand(3000, 15000); // Cooldown for next power switch
+    }
+
+    // Select saber attack animation level based on enemy health and bot's force power.
+    // Ensure bot_entity and its client are valid before accessing ps.
+    if (bot_entity && bot_entity->client) {
+        if (bs->currentEnemy->health > 75 && bot_entity->client->ps.fd.forcePowerLevel[FP_SABERATTACK] > 2) {
+            if (bot_entity->client->ps.fd.saberAnimLevel != FORCE_LEVEL_3 && bs->saberPower) {
+                Cmd_SaberAttackCycle_f(bot_entity); // Switch to strong attack
+            }
+        } else if (bs->currentEnemy->health > 40 && bot_entity->client->ps.fd.forcePowerLevel[FP_SABERATTACK] > 1) {
+            if (bot_entity->client->ps.fd.saberAnimLevel != FORCE_LEVEL_2) {
+                Cmd_SaberAttackCycle_f(bot_entity); // Switch to medium attack
+            }
+        } else {
+            if (bot_entity->client->ps.fd.saberAnimLevel != FORCE_LEVEL_1) {
+                Cmd_SaberAttackCycle_f(bot_entity); // Switch to quick attack
+            }
+        }
+    }
+
+    // Check if the enemy is within saber attack range.
+    if (bs->frame_Enemy_Len <= SABER_ATTACK_RANGE) {
+        bs->doAttack = qtrue;
+        SaberCombatHandling(bs); // Perform saber-specific combat maneuvers/logic.
+
+        // Original commented-out logic:
+        // if(PrimFiring(bs)) { KeepPrimFromFiring(bs); }
+        // if (bs->frame_Enemy_Len < 80) { meleestrafe = 1; }
+    } else {
+        bs->doAttack = qfalse;
+    }
+
+    // If all conditions met and doAttack is set, execute the attack.
+    if (bs->doAttack) {
+        trap_EA_Attack(bs->client);
+    }
+}
+
+static void StandardBotAI(bot_state_t* bs, float thinktime) {
+	// --- 1. Global AI Deactivation Check ---
+	// If AI is globally deactivated, clear bot's targets and waypoints and do nothing further.
+	if (gDeactivated) {
+		bs->wpCurrent = NULL;       // Clear current waypoint
+		bs->currentEnemy = NULL;    // Clear current enemy
+		bs->wpDestination = NULL;   // Clear destination waypoint
+		bs->wpDirection = 0;        // Reset waypoint direction
+		return;
+	}
+
+	// --- 2. Spectator Check ---
+	// Check if the bot's associated client entity is valid and in spectator mode.
+	// If so, clear targets and waypoints and do nothing further.
+	// It's important to check g_entities[bs->client].inuse and g_entities[bs->client].client
+	// before accessing client->sess.sessionTeam to prevent crashes if the entity is not in use
+	// or not a client.
+	if (bs->client >= 0 && bs->client < MAX_CLIENTS && // Basic bounds check for bs->client
+		g_entities[bs->client].inuse &&
+		g_entities[bs->client].client &&
+		g_entities[bs->client].client->sess.sessionTeam == TEAM_SPECTATOR) {
+		bs->wpCurrent = NULL;
+		bs->currentEnemy = NULL;
+		bs->wpDestination = NULL;
+		bs->wpDirection = 0;
+		return;
+	}
+
+	// --- 3. Respawn Check ---
+	// If the Respawn function handles the bot's logic for this frame (e.g., bot just respawned),
+	// then return and let other logic proceed in a subsequent frame.
+	if (Respawn(bs)) {
+		return;
+	}
+
+	SetEnemyTarget(bs);
+	Movement(bs);
 
 	AimAtEnemy(bs, thinktime);
 	AttackEnemy(bs);
-}
-
-static void UseInventoryItem(bot_state_t* bs)
-{
-	if (BotUseInventoryItem(bs))
-	{
-		if (rand() % 10 < 5)
-		{
-			trap_EA_Use(bs->client);
-		}
-	}
-}
-
-static void WaypointNavigation(bot_state_t* bs) {
-	float distance;
-	int closestWp = -1;
-	int i = 0;
-	int waypointIndex = -1;
-	vec3_t difference = { 0.0f, 0.0f, 0.0f };
-	qboolean stop = qfalse;
-
-	// If you dont have a wp for whatever reason you need to find one
-	// - for right now it only tracks if you dont have a wp
-	// - in the future it will track if wpSeenTime > level.time etc...
-	if (!bs->wpCurrent) {
-		waypointIndex = GetNearestVisibleWP(bs->origin, bs->client);
-
-		if (waypointIndex != -1) {
-			VectorCopy(gWPArray[waypointIndex]->origin, bs->goalPosition);
-			bs->wpCurrent = gWPArray[waypointIndex];
-			bs->wpToGoalCount = 0;
-			// TStar(NULL, gWPArray[1], gWPArray[4], bs->wpToGoal, bs->wpToGoalCount);
-			// PStar(gWPArray[1], gWPArray[4], gWPArray, gWPNum, bs->wpToGoal, bs->wpToGoalCount);
-			bs->wpSeenTime = level.time + 1500;
-			bs->wpTravelTime = level.time + 10000; //never take more than 10 seconds to travel to a waypoint
-		}
-
-		return;
-	}
-
-	VectorSubtract(bs->origin, bs->wpCurrent->origin, difference);
-	distance = VectorLength(difference);
-
-	if (distance > 64.0f) {
-		return;
-	}
-
-	ClosestPlayer(bs, &closestWp);
-
-	if (closestWp != -1 && closestWp != *(bs->wpToGoal[(*(bs->wpToGoalCount) - 1)])) {
-		(*bs->wpToGoalCount) = 0;
-		G_Printf(S_COLOR_GREEN "TStar\n");
-		TStar(NULL, bs->wpCurrent, gWPArray[closestWp], bs->wpToGoal, bs->wpToGoalCount);
-	}
-
-	if ((*bs->wpToGoalCount) <= 0) {
-		G_Printf(S_COLOR_RED "STOP\n");
-		bs->beStill = level.time + 1000;
-		return;
-	}
-
-	waypointIndex = *(bs->wpToGoal[0]);
-
-	if (bs->wpCurrent->index == waypointIndex) {
-		for (i = 0; i < *(bs->wpToGoalCount) - 1; i++)
-		{
-			bs->wpToGoal[i] = bs->wpToGoal[i + 1];
-		}
-
-		(*bs->wpToGoalCount)--;
-
-		waypointIndex = *(bs->wpToGoal[0]);
-	}
-
-	VectorCopy(gWPArray[waypointIndex]->origin, bs->goalPosition);
-	bs->wpCurrent = gWPArray[waypointIndex];
-	bs->wpSeenTime = level.time + 1500;
-	bs->wpTravelTime = level.time + 10000; //never take more than 10 seconds to travel to a waypoint
-
-	for (i = 0; i < *(bs->wpToGoalCount) - 1; i++)
-	{
-		bs->wpToGoal[i] = bs->wpToGoal[i + 1];
-	}
-
-	(*bs->wpToGoalCount)--;
-}
-
-static void Movement(bot_state_t* bs)
-{
-	if (bs->beStill > level.time) { return; }
-
-	VectorSubtract(bs->goalPosition, bs->origin, bs->goalMovedir);
-	VectorNormalize(bs->goalMovedir);
-	trap_EA_Move(bs->client, bs->goalMovedir, 5000);
-}
-
-static void StandardBotAI(bot_state_t* bs, float thinktime)
-{
-	int wp, enemy;
-	int desiredIndex;
-	int goalWPIndex;
-	int doingFallback = 0;
-	int fjHalt;
-	vec3_t a, ang, headlevel, eorg, noz_x, noz_y, dif, a_fo;
-	float reaction;
-	float bLeadAmount;
-	int meleestrafe = 0;
-	int useTheForce = 0;
-	int forceHostile = 0;
-	gentity_t *friendInLOF = 0;
-	float mLen;
-	int visResult = 0;
-	int selResult = 0;
-	int mineSelect = 0;
-	int detSelect = 0;
-
-	if (gDeactivated)
-	{
-		bs->wpCurrent = NULL;
-		bs->currentEnemy = NULL;
-		bs->wpDestination = NULL;
-		bs->wpDirection = 0;
-		return;
-	}
-
-	if (g_entities[bs->client].inuse &&
-		g_entities[bs->client].client &&
-		g_entities[bs->client].client->sess.sessionTeam == TEAM_SPECTATOR)
-	{
-		bs->wpCurrent = NULL;
-		bs->currentEnemy = NULL;
-		bs->wpDestination = NULL;
-		bs->wpDirection = 0;
-		return;
-	}
-
-	if (Respawn(bs)) { return; }
-
-	// fjHalt = 0;
-
-	// doingFallback = 0;
-
-	CheckEnemyState(bs, thinktime);
-	UseInventoryItem(bs); 
-	WaypointNavigation(bs);
-
-	//reaction = bs->skills.reflex / bs->settings.skill;
-
-	//if (reaction < 0)
-	//{
-	//	reaction = 0;
-	//}
-	//if (reaction > 2000)
-	//{
-	//	reaction = 2000;
-	//}
-
-	//if (!bs->currentEnemy)
-	//{
-	//	bs->timeToReact = level.time + reaction;
-	//}
-	//
-
-	// PowTecH - Movement
-	Movement(bs);
-	MoveTowardIdealAngles(bs);
-	//
 }
 // PowTecH - End Point
 

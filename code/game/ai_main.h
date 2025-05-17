@@ -357,8 +357,9 @@ typedef struct bot_state_s
 	//end rww
 
 	// PowTecH - Properties
-	int* wpToGoal[MAX_NEIGHBOR_LINK_DISTANCE];
-	int* wpToGoalCount;
+	int wpToGoal[MAX_NEIGHBOR_LINK_DISTANCE];
+	int wpToGoalCount;
+	int currentPathWaypointIndex;
 	//
 } bot_state_t;
 
