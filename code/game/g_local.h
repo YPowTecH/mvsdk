@@ -524,6 +524,11 @@ typedef struct {
 	// MVSDK
 	qboolean	bboxEncoding;
 	qboolean	modelindexTime2;
+
+	// PowTecH
+	qboolean isWarmup;
+	int zCurrentTickets;
+	//
 } level_locals_t;
 
 
@@ -761,7 +766,7 @@ team_t PickTeam( int ignoreClientNum );
 void SetClientViewAngle( gentity_t *ent, vec3_t angle );
 gentity_t *SelectSpawnPoint ( vec3_t avoidPoint, vec3_t origin, vec3_t angles );
 void CopyToBodyQue( gentity_t *ent );
-void respawn (gentity_t *ent);
+void respawn(gentity_t *ent);
 void BeginIntermission (void);
 void InitBodyQue (void);
 void ClientSpawn( gentity_t *ent );
@@ -836,6 +841,8 @@ int myrand( void );
 void MV_BBoxToTime2( gentity_t *ent );
 void MV_ModelindexToTime2( gentity_t *ent );
 
+void UpdateGameState();
+
 //
 // g_client.c
 //
@@ -895,9 +902,10 @@ void G_RemoveQueuedBotBegin( int clientNum );
 qboolean G_BotConnect( int clientNum, qboolean restart );
 void Svcmd_AddBot_f( void );
 void Svcmd_BotList_f( void );
-void BotInterbreedEndMatch( void );
 qboolean G_DoesMapSupportGametype(const char *mapname, int gametype);
 const char *G_RefreshNextMap(int gametype, qboolean forced);
+int G_CountBotPlayers(int team);
+int G_CountHumanPlayers(int team);
 
 // w_force.c / w_saber.c
 gentity_t *G_PreDefSound(vec3_t org, int pdSound);
@@ -947,9 +955,9 @@ void InitSagaMode(void);
 // ai_main.c
 #define MAX_FILEPATH			144
 
-int		OrgVisible		( vec3_t org1, vec3_t org2, int ignore);
-void	BotOrder		( gentity_t *ent, int clientnum, int ordernum);
-int		InFieldOfVision	( vec3_t viewangles, float fov, vec3_t angles);
+int		OrgVisible(vec3_t org1, vec3_t org2, int ignore);
+void	BotOrder(gentity_t *ent, int clientnum, int ordernum);
+int		InFieldOfVision(vec3_t viewangles, float fov, vec3_t angles);
 
 // ai_util.c
 void B_InitAlloc(void);

@@ -581,6 +581,15 @@ void G_RemapTeamShaders( void ) {
 }
 
 
+// PowTecH - Setup Game
+static void Z_SetupGame() {
+	G_Printf(S_COLOR_CYAN "Setup\n");
+	level.warmupTime = -1;
+	level.isWarmup = qtrue;
+	level.zCurrentTickets = 1;
+}
+//
+
 /*
 =================
 G_RegisterCvars
@@ -900,6 +909,8 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	{
 		G_LogPrintf("Duel Tournament Begun: kill limit %d, win limit: %d\n", g_fraglimit.integer, g_duel_fraglimit.integer );
 	}
+
+	Z_SetupGame();
 }
 
 
@@ -2145,163 +2156,6 @@ FUNCTIONS CALLED EVERY FRAME
 */
 
 /*
-=============
-CheckTournament
-
-Once a frame, check for changes in tournement player state
-=============
-*/
-void CheckTournament( void ) {
-	// check because we run 3 game frames before calling Connect and/or ClientBegin
-	// for clients on a map_restart
-	if ( level.numPlayingClients == 0 ) {
-		return;
-	}
-
-	if ( g_gametype.integer == GT_TOURNAMENT ) {
-
-		// pull in a spectator if needed
-		if ( level.numPlayingClients < 2 ) {
-			AddTournamentPlayer();
-
-			if (level.numPlayingClients >= 2)
-			{
-				trap_SetConfigstring ( CS_CLIENT_DUELISTS, va("%i|%i", level.sortedClients[0], level.sortedClients[1] ) );
-				gDuelist1 = level.sortedClients[0];
-				gDuelist2 = level.sortedClients[1];
-			}
-		}
-
-		if (level.numPlayingClients >= 2)
-		{
-			if (gDuelist1 == -1 ||
-				gDuelist2 == -1)
-			{
-				trap_SetConfigstring ( CS_CLIENT_DUELISTS, va("%i|%i", level.sortedClients[0], level.sortedClients[1] ) );
-				gDuelist1 = level.sortedClients[0];
-				gDuelist2 = level.sortedClients[1];
-				if ( g_austrian.integer )
-				{
-					G_LogPrintf("Duel Initiated: %s %d/%d vs %s %d/%d, kill limit: %d\n", 
-						level.clients[level.sortedClients[0]].pers.netname,
-						level.clients[level.sortedClients[0]].sess.wins,
-						level.clients[level.sortedClients[0]].sess.losses,
-						level.clients[level.sortedClients[1]].pers.netname,
-						level.clients[level.sortedClients[1]].sess.wins,
-						level.clients[level.sortedClients[1]].sess.losses,
-						g_fraglimit.integer );
-				}
-				//trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
-				//FIXME: This seems to cause problems. But we'd like to reset things whenever a new opponent is set.
-			}
-		}
-
-		//rww - It seems we have decided there will be no warmup in duel.
-		//if (!g_warmup.integer)
-		{ //don't care about any of this stuff then, just add people and leave me alone
-			level.warmupTime = 0;
-			return;
-		}
-#if 0
-		// if we don't have two players, go back to "waiting for players"
-		if ( level.numPlayingClients != 2 ) {
-			if ( level.warmupTime != -1 ) {
-				level.warmupTime = -1;
-				trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
-				G_LogPrintf( "Warmup:\n" );
-			}
-			return;
-		}
-
-		if ( level.warmupTime == 0 ) {
-			return;
-		}
-
-		// if the warmup is changed at the console, restart it
-		if ( g_warmup.modificationCount != level.warmupModificationCount ) {
-			level.warmupModificationCount = g_warmup.modificationCount;
-			level.warmupTime = -1;
-		}
-
-		// if all players have arrived, start the countdown
-		if ( level.warmupTime < 0 ) {
-			if ( level.numPlayingClients == 2 ) {
-				// fudge by -1 to account for extra delays
-				level.warmupTime = level.time + ( g_warmup.integer - 1 ) * 1000;
-
-				if (level.warmupTime < (level.time + 3000))
-				{ //rww - this is an unpleasent hack to keep the level from resetting completely on the client (this happens when two map_restarts are issued rapidly)
-					level.warmupTime = level.time + 3000;
-				}
-				trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
-			}
-			return;
-		}
-
-		// if the warmup time has counted down, restart
-		if ( level.time > level.warmupTime ) {
-			level.warmupTime += 10000;
-			trap_Cvar_Set( "g_restarted", "1" );
-			trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
-			level.restarted = qtrue;
-			return;
-		}
-#endif
-	} else if ( level.warmupTime != 0 ) {
-		int		counts[TEAM_NUM_TEAMS];
-		qboolean	notEnough = qfalse;
-
-		if ( g_gametype.integer > GT_TEAM ) {
-			counts[TEAM_BLUE] = TeamCount( -1, TEAM_BLUE );
-			counts[TEAM_RED] = TeamCount( -1, TEAM_RED );
-
-			if (counts[TEAM_RED] < 1 || counts[TEAM_BLUE] < 1) {
-				notEnough = qtrue;
-			}
-		} else if ( level.numPlayingClients < 2 ) {
-			notEnough = qtrue;
-		}
-
-		if ( notEnough ) {
-			if ( level.warmupTime != -1 ) {
-				level.warmupTime = -1;
-				trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
-				G_LogPrintf( "Warmup:\n" );
-			}
-			return; // still waiting for team members
-		}
-
-		if ( level.warmupTime == 0 ) {
-			return;
-		}
-
-		// if the warmup is changed at the console, restart it
-		if ( g_warmup.modificationCount != level.warmupModificationCount ) {
-			level.warmupModificationCount = g_warmup.modificationCount;
-			level.warmupTime = -1;
-		}
-
-		// if all players have arrived, start the countdown
-		if ( level.warmupTime < 0 ) {
-			// fudge by -1 to account for extra delays
-			level.warmupTime = level.time + ( g_warmup.integer - 1 ) * 1000;
-			trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
-			return;
-		}
-
-		// if the warmup time has counted down, restart
-		if ( level.time > level.warmupTime ) {
-			level.warmupTime += 10000;
-			trap_Cvar_Set( "g_restarted", "1" );
-			trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
-			level.restarted = qtrue;
-			return;
-		}
-	}
-}
-
-
-/*
 ==================
 CheckVote
 ==================
@@ -2547,6 +2401,52 @@ int g_TimeSinceLastFrame = 0;
 qboolean gDoSlowMoDuel = qfalse;
 int gSlowMoDuelTime = 0;
 
+
+// PowTecH - Check Game State
+static void CheckGameState() {
+	// Warmup
+	if (level.isWarmup) {
+		qboolean notEnough = qfalse;
+
+		if (G_CountHumanPlayers(TEAM_FREE) == 0) {
+			level.warmupTime = -1;
+			trap_SetConfigstring(CS_WARMUP, va("%i", level.warmupTime));
+			return;
+		}
+
+		if (level.warmupTime < 0) {
+			level.warmupTime = level.time + (g_warmup.integer - 1) * 1000;
+			trap_SetConfigstring(CS_WARMUP, va("%i", level.warmupTime));
+			return;
+		}
+
+		// if the warmup is changed at the console, restart it
+		if (g_warmup.modificationCount != level.warmupModificationCount) {
+			level.warmupModificationCount = g_warmup.modificationCount;
+			level.warmupTime = -1;
+			return;
+		}
+
+		if (level.time > level.warmupTime) {
+			level.warmupTime = -1;
+			level.isWarmup = qfalse;
+			level.zCurrentTickets = 2;
+			return;
+		}
+	}
+
+	// PowTecH - for later i want to make sure the server gets restarted when all players die or all humans leave
+	// if the warmup time has counted down, restart
+	//if ( level.time > level.warmupTime ) {
+	//	level.warmupTime += 10000;
+	//	trap_Cvar_Set( "g_restarted", "1" );
+	//	trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
+	//	level.restarted = qtrue;
+	//	return;
+	//}
+}
+//
+
 /*
 ================
 G_RunFrame
@@ -2728,9 +2628,6 @@ start = trap_Milliseconds();
 	}
 end = trap_Milliseconds();
 
-	// see if it is time to do a tournement restart
-	CheckTournament();
-
 	// see if it is time to end the level
 	CheckExitRules();
 
@@ -2743,6 +2640,8 @@ end = trap_Milliseconds();
 	// check team votes
 	CheckTeamVote( TEAM_RED );
 	CheckTeamVote( TEAM_BLUE );
+
+	CheckGameState();
 
 	// for tracking changes
 	CheckCvars();
@@ -2880,3 +2779,11 @@ void MV_ModelindexToTime2( gentity_t *ent )
 	ent->s.time2 = ent->s.modelindex;
 }
 
+// PowTechH 
+void UpdateGameState() {
+	int count = G_CountBotPlayers(TEAM_FREE);
+
+	if (count <= 0) {
+		level.isWarmup = qtrue;
+	}
+}

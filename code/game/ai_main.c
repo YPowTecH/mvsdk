@@ -5297,100 +5297,111 @@ static void UseInventoryItem(bot_state_t* bs)
 }
 
 // PowTecH - Start Point
-static qboolean Respawn(bot_state_t* bs)
-{
-	//just spawned in?
-	if (!bs->lastDeadTime)
-	{
+static void RespawnResetState(bot_state_t* bs) {
+	// BotResetState(...) - might want to use this?
+	bs->wpCurrent = NULL;
+	bs->currentEnemy = NULL;
+	bs->wpDestination = NULL;
+	bs->wpCamping = NULL;
+	bs->wpCampingTo = NULL;
+	bs->wpStoreDest = NULL;
+
+	bs->wpDestIgnoreTime = 0;
+	bs->wpDestSwitchTime = 0;
+	bs->wpSeenTime = 0;
+	bs->wpTravelTime = 0;
+	bs->wpDirection = 0;
+	bs->wpToGoalCount = 0;
+	bs->currentPathWaypointIndex = 0;
+
+	// Reset the attack states
+	bs->doAttack = qfalse;
+	bs->doAltAttack = qfalse;
+
+	// Reset other combat/movement states
+	bs->frame_Enemy_Vis = 0;
+	bs->frame_Enemy_Len = 0;
+	VectorClear(bs->goalMovedir);
+	// bs->goalPosition might be set by spawn point logic, or cleared if needed: VectorClear(bs->goalPosition);
+
+	// Set default weapon (e.g., saber)
+	bs->virtualWeapon = WP_SABER; // Assuming WP_SABER is the desired default
+	BotSelectWeapon(bs->client, WP_SABER);
+}
+
+static qboolean Respawn(bot_state_t* bs) {
+	gentity_t* bot_ent = &g_entities[bs->client]; // Get the bot's entity
+
+	// Case 1: Initial spawn into the game (or first time this function is called for the bot)
+	if (!bs->lastDeadTime) { // lastDeadTime is 0 if never set
+		bs->lastDeadTime = level.time; // Set it to current time to mark as "alive"
+		RespawnResetState(bs);
+		bs->deathActivitiesDone = qfalse; // Ensure death activities are reset for the new life
+		// Any other first-spawn specific logic can go here
+		return qtrue; // Bot just "spawned"
+	}
+
+	// Case 2: Bot has died (health is less than 1) and needs to respawn
+	if (bot_ent->client->ps.stats[STAT_HEALTH] <= 0) {
+		if (bot_ent->client->respawnTime &&
+			bot_ent->client->respawnTime > 0) {
+			if (level.time < bot_ent->client->respawnTime) {
+				return qtrue; // "respawning"
+			}
+			else if (bs->deathActivitiesDone && level.time >= bot_ent->client->respawnTime) {
+				if (level.zCurrentTickets > 0) {
+					level.zCurrentTickets--;
+					respawn(bot_ent);
+					G_Printf(S_COLOR_CYAN "Decide: %i \n", level.zCurrentTickets);
+				}
+				else {
+					SetTeam(bot_ent, "spectator");
+					G_Printf(S_COLOR_CYAN "Decide: %i \n", level.zCurrentTickets);
+				}
+
+				UpdateGameState();
+
+				return qtrue; // respawned
+			}
+		}
+
+		// Perform death-related activities only once per death
+		if (!bs->deathActivitiesDone) {
+			bs->deathActivitiesDone = qtrue; // Mark death activities as done for this death
+		}
+		else {
+			return qtrue;
+		}
+
+		// Reset state for the new life (after "respawn" which is usually handled by engine)
+		// This function is more about reacting to the death and preparing for the next spawn event.
+		// The actual respawn (health restored, moved to spawn point) is typically engine-driven.
+		// We set lastDeadTime here to indicate the bot is currently in a "dead" state awaiting engine respawn.
 		bs->lastDeadTime = level.time;
-		bs->wpCurrent = NULL;
-		bs->currentEnemy = NULL;
-		bs->wpDestination = NULL;
-		bs->wpCamping = NULL;
-		bs->wpCampingTo = NULL;
-		bs->wpStoreDest = NULL;
-		bs->wpDestIgnoreTime = 0;
-		bs->wpDestSwitchTime = 0;
-		bs->wpSeenTime = 0;
-		bs->wpTravelTime = 0;
-		bs->wpDirection = 0;
-		bs->wpToGoalCount = 0;
+		RespawnResetState(bs); // Reset state for the upcoming new life
+		// deathActivitiesDone will be reset to qfalse when the bot's health is > 0 again (next spawn)
+		// OR, if the engine respawns immediately and this function is called again,
+		// the !bs->lastDeadTime logic might not trigger as expected if health > 0.
+		// A common pattern is to check if health > 0 AND lastDeadTime indicates a recent death.
 
-		// Reset the attack states
-		bs->doAttack = 0;
-		bs->doAltAttack = 0;
-
-		bs->deathActivitiesDone = 0;
-
-		// Set weapon
-		bs->virtualWeapon = WP_SABER;
-		BotSelectWeapon(bs->client, WP_SABER);
-
+		bot_ent->client->respawnTime = level.time + (5 * 1000);
+		G_Printf(S_COLOR_CYAN "Decide \n");
 		return qtrue;
 	}
 
-	if (g_entities[bs->client].health < 1)
-	{
-		bs->lastDeadTime = level.time;
-
-		if (!bs->deathActivitiesDone && 
-			bs->lastHurt && 
-			bs->lastHurt->client && 
-			bs->lastHurt->s.number != bs->client)
-		{
-			BotDeathNotify(bs);
-			if (PassLovedOneCheck(bs, bs->lastHurt))
-			{
-				//CHAT: Died
-				bs->chatObject = bs->lastHurt;
-				bs->chatAltObject = NULL;
-				BotDoChat(bs, "Died", 0);
-			}
-			else if (!PassLovedOneCheck(bs, bs->lastHurt) &&
-				botstates[bs->lastHurt->s.number] &&
-				PassLovedOneCheck(botstates[bs->lastHurt->s.number], &g_entities[bs->client]))
-			{ //killed by a bot that I love, but that does not love me
-				bs->chatObject = bs->lastHurt;
-				bs->chatAltObject = NULL;
-				BotDoChat(bs, "KilledOnPurposeByLove", 0);
-			}
-
-			bs->deathActivitiesDone = 1;
-		}
-
-		bs->wpCurrent = NULL;
-		bs->currentEnemy = NULL;
-		bs->wpDestination = NULL;
-		bs->wpCamping = NULL;
-		bs->wpCampingTo = NULL;
-		bs->wpStoreDest = NULL;
-		bs->wpDestIgnoreTime = 0;
-		bs->wpDestSwitchTime = 0;
-		bs->wpSeenTime = 0;
-		bs->wpTravelTime = 0;
-		bs->wpDirection = 0;
-		bs->wpToGoalCount = 0;
-
-		// Reset the attack states
-		bs->doAttack = 0;
-		bs->doAltAttack = 0;
-
-		bs->deathActivitiesDone = 0;
-
-		// Set weapon
-		bs->virtualWeapon = WP_SABER;
-		BotSelectWeapon(bs->client, WP_SABER);
-
-		if (rand() % 10 < 5 &&
-			(!bs->doChat || bs->chatTime < level.time))
-		{
-			trap_EA_Attack(bs->client);
-		}
-
-		return qtrue;
+	// If bot was dead and is now alive (engine respawned it)
+	if (bs->lastDeadTime != 0 && bot_ent->client->ps.stats[STAT_HEALTH] > 0 && bs->deathActivitiesDone) {
+		// Bot was dead (deathActivitiesDone was true), and now is alive.
+		// This signifies a fresh spawn after a death.
+		RespawnResetState(bs);       // Reset state for the new life
+		bs->deathActivitiesDone = qfalse; // Ready for new death activities if it dies again
+		bs->lastDeadTime = level.time; // Update last "death" time to effectively mean "last spawn time" now
+		// or could be set to 0 to indicate "fully alive, not recently dead"
+		// For simplicity, let's keep it as current time, meaning "just spawned".
+		return qtrue; // Bot just effectively respawned into a new life
 	}
 
-	return qfalse;
+	return qfalse; // Bot is alive and not in a spawn/respawn transition
 }
 
 static gentity_t* BotFindBestAvailableEnemy(bot_state_t* bs) {
@@ -5480,10 +5491,27 @@ static float CalculateHeuristic(int waypointIndexA, int waypointIndexB) {
 
 static qboolean BotPathfindAStar(bot_state_t* bs, int startWaypointIndex, int goalWaypointIndex) {
 	int i;
-	wpobject_t* startNode = GetWaypointByIndex(startWaypointIndex);
-	wpobject_t* goalNode = GetWaypointByIndex(goalWaypointIndex);
+	wpobject_t* startNode;
+	wpobject_t* goalNode;
 	wpobject_t* currentNodeObj;
+	wpobject_t* neighborNodeObj;
+
+	// Variables for the main A* loop, declared at the top of the function or block for C89
+	int currentWaypointIndex;
+	float lowestFCost;
+	int openSetNodePos;
+	wpconnection_t* neighborConn;
+	int neighborIndex;
 	float tentativeGCost;
+
+	// tempPath is moved to static storage to reduce stack usage.
+	static int tempPath[MAX_WPARRAY_SIZE];
+	int pathIndex; // For reconstructing path
+	int curr;      // For reconstructing path
+
+
+	startNode = GetWaypointByIndex(startWaypointIndex);
+	goalNode = GetWaypointByIndex(goalWaypointIndex);
 
 	if (!startNode || !goalNode) {
 		bs->wpToGoalCount = 0;
@@ -5511,10 +5539,10 @@ static qboolean BotPathfindAStar(bot_state_t* bs, int startWaypointIndex, int go
 
 	// 3. Main A* loop
 	while (openSetCount > 0) {
-		// Find node with the lowest F cost in the open set
-		int currentWaypointIndex = -1;
-		float lowestFCost = ASTAR_INFINITE_COST;
-		int openSetNodePos = -1;
+		// Initialize for this iteration (C89: declarations at top of block)
+		currentWaypointIndex = -1;
+		lowestFCost = ASTAR_INFINITE_COST;
+		openSetNodePos = -1;
 
 		for (i = 0; i < openSetCount; i++) {
 			int nodeIndex = openSet[i];
@@ -5533,9 +5561,8 @@ static qboolean BotPathfindAStar(bot_state_t* bs, int startWaypointIndex, int go
 		// If current is the goal, path found
 		if (currentWaypointIndex == goalWaypointIndex) {
 			// Reconstruct path
-			int pathIndex = 0;
-			int tempPath[MAX_WPARRAY_SIZE];
-			int curr = goalWaypointIndex;
+			pathIndex = 0; // Initialize pathIndex
+			curr = goalWaypointIndex; // Initialize curr
 			while (curr != -1 && pathIndex < MAX_WPARRAY_SIZE) {
 				tempPath[pathIndex++] = curr;
 				curr = astar_node_workspace[curr].parentWaypointIndex;
@@ -5548,7 +5575,6 @@ static qboolean BotPathfindAStar(bot_state_t* bs, int startWaypointIndex, int go
 					bs->wpToGoal[bs->wpToGoalCount++] = tempPath[i];
 				}
 				else {
-					// path too long
 					break;
 				}
 			}
@@ -5566,9 +5592,9 @@ static qboolean BotPathfindAStar(bot_state_t* bs, int startWaypointIndex, int go
 		if (!currentNodeObj) continue;
 
 		for (i = 0; i < currentNodeObj->connectionsCount; i++) {
-			wpconnection_t* neighborConn = &currentNodeObj->connections[i];
-			int neighborIndex = neighborConn->index;
-			wpobject_t* neighborNodeObj = GetWaypointByIndex(neighborIndex);
+			neighborConn = &currentNodeObj->connections[i];
+			neighborIndex = neighborConn->index;
+			neighborNodeObj = GetWaypointByIndex(neighborIndex);
 
 			if (!neighborNodeObj || !neighborNodeObj->inuse) continue;
 			if (astar_node_workspace[neighborIndex].inClosedSet) continue;
@@ -5582,7 +5608,7 @@ static qboolean BotPathfindAStar(bot_state_t* bs, int startWaypointIndex, int go
 				astar_node_workspace[neighborIndex].fCost = astar_node_workspace[neighborIndex].gCost + astar_node_workspace[neighborIndex].hCost;
 
 				if (!astar_node_workspace[neighborIndex].inOpenSet) {
-					if (openSetCount < MAX_WPARRAY_SIZE) { // Check against MAX_WPARRAY_SIZE for openSet capacity
+					if (openSetCount < MAX_WPARRAY_SIZE) {
 						openSet[openSetCount++] = neighborIndex;
 						astar_node_workspace[neighborIndex].inOpenSet = qtrue;
 					}
@@ -5873,7 +5899,12 @@ static void StandardBotAI(bot_state_t* bs, float thinktime) {
 	// It's important to check g_entities[bs->client].inuse and g_entities[bs->client].client
 	// before accessing client->sess.sessionTeam to prevent crashes if the entity is not in use
 	// or not a client.
-	if (bs->client >= 0 && bs->client < MAX_CLIENTS && // Basic bounds check for bs->client
+	if (g_entities[bs->client].client->sess.sessionTeam == TEAM_SPECTATOR &&
+		level.zCurrentTickets > 0) {
+		SetTeam(&g_entities[bs->client], "f");
+	}
+
+	if (bs->client >= 0 && bs->client < MAX_CLIENTS &&
 		g_entities[bs->client].inuse &&
 		g_entities[bs->client].client &&
 		g_entities[bs->client].client->sess.sessionTeam == TEAM_SPECTATOR) {
@@ -5881,6 +5912,7 @@ static void StandardBotAI(bot_state_t* bs, float thinktime) {
 		bs->currentEnemy = NULL;
 		bs->wpDestination = NULL;
 		bs->wpDirection = 0;
+		bs->wpToGoalCount = 0;
 		return;
 	}
 
@@ -5888,6 +5920,7 @@ static void StandardBotAI(bot_state_t* bs, float thinktime) {
 	// If the Respawn function handles the bot's logic for this frame (e.g., bot just respawned),
 	// then return and let other logic proceed in a subsequent frame.
 	if (Respawn(bs)) {
+		bs->wpToGoalCount = 0;
 		return;
 	}
 

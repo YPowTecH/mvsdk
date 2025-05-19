@@ -778,7 +778,11 @@ void SetTeam( gentity_t *ent, char *s ) {
 		CheckTeamLeader( oldTeam );
 	}
 
-	BroadcastTeamChange( client, oldTeam );
+	// PowTecH - Refactored
+	if (!(ent->r.svFlags & SVF_BOT)) {
+		BroadcastTeamChange(client, oldTeam);
+	}
+	// PowTecH - End
 
 	// get and distribute relevent paramters
 	ClientUserinfoChanged( clientNum );

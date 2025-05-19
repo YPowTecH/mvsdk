@@ -542,7 +542,7 @@ void AddScore( gentity_t *ent, vec3_t origin, int score ) {
 		return;
 	}
 	// no scoring during pre-match warmup
-	if ( level.warmupTime ) {
+	if ( level.isWarmup ) {
 		return;
 	}
 	// show score plum
