@@ -234,7 +234,7 @@ typedef struct bot_state_s
 
 	float				destinationGrabTime;
 	float				wpSeenTime;
-	float				wpTravelTime;
+	int					wpTravelTime;
 	float				wpDestSwitchTime;
 	float				wpSwitchTime;
 	float				wpDestIgnoreTime;

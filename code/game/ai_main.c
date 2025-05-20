@@ -95,6 +95,7 @@ gentity_t *droppedBlueFlag;
      (enemy_ptr)->client->sess.sessionTeam != TEAM_SPECTATOR)
 
 #define ASTAR_INFINITE_COST 999999.0f
+#define BOT_WAYPOINT_TRAVEL_TIMEOUT 1000
 
 typedef struct astar_node_data_s {
 	int parentWaypointIndex;    // Index of the waypoint this node came from
@@ -5325,20 +5326,19 @@ static void RespawnResetState(bot_state_t* bs) {
 	// bs->goalPosition might be set by spawn point logic, or cleared if needed: VectorClear(bs->goalPosition);
 
 	// Set default weapon (e.g., saber)
-	bs->virtualWeapon = WP_SABER; // Assuming WP_SABER is the desired default
+	bs->virtualWeapon = WP_SABER;
 	BotSelectWeapon(bs->client, WP_SABER);
 }
 
 static qboolean Respawn(bot_state_t* bs) {
-	gentity_t* bot_ent = &g_entities[bs->client]; // Get the bot's entity
+	gentity_t* bot_ent = &g_entities[bs->client];
 
 	// Case 1: Initial spawn into the game (or first time this function is called for the bot)
-	if (!bs->lastDeadTime) { // lastDeadTime is 0 if never set
-		bs->lastDeadTime = level.time; // Set it to current time to mark as "alive"
+	if (!bs->lastDeadTime) {
+		bs->lastDeadTime = level.time;
 		RespawnResetState(bs);
-		bs->deathActivitiesDone = qfalse; // Ensure death activities are reset for the new life
-		// Any other first-spawn specific logic can go here
-		return qtrue; // Bot just "spawned"
+		bs->deathActivitiesDone = qfalse;
+		return qtrue; // spawn
 	}
 
 	// Case 2: Bot has died (health is less than 1) and needs to respawn
@@ -5346,17 +5346,15 @@ static qboolean Respawn(bot_state_t* bs) {
 		if (bot_ent->client->respawnTime &&
 			bot_ent->client->respawnTime > 0) {
 			if (level.time < bot_ent->client->respawnTime) {
-				return qtrue; // "respawning"
+				return qtrue; // respawning
 			}
 			else if (bs->deathActivitiesDone && level.time >= bot_ent->client->respawnTime) {
 				if (level.zCurrentTickets > 0) {
 					level.zCurrentTickets--;
 					respawn(bot_ent);
-					G_Printf(S_COLOR_CYAN "Decide: %i \n", level.zCurrentTickets);
 				}
 				else {
 					SetTeam(bot_ent, "spectator");
-					G_Printf(S_COLOR_CYAN "Decide: %i \n", level.zCurrentTickets);
 				}
 
 				UpdateGameState();
@@ -5365,9 +5363,8 @@ static qboolean Respawn(bot_state_t* bs) {
 			}
 		}
 
-		// Perform death-related activities only once per death
 		if (!bs->deathActivitiesDone) {
-			bs->deathActivitiesDone = qtrue; // Mark death activities as done for this death
+			bs->deathActivitiesDone = qtrue;
 		}
 		else {
 			return qtrue;
@@ -5385,7 +5382,6 @@ static qboolean Respawn(bot_state_t* bs) {
 		// A common pattern is to check if health > 0 AND lastDeadTime indicates a recent death.
 
 		bot_ent->client->respawnTime = level.time + (5 * 1000);
-		G_Printf(S_COLOR_CYAN "Decide \n");
 		return qtrue;
 	}
 
@@ -5426,32 +5422,25 @@ static gentity_t* BotFindBestAvailableEnemy(bot_state_t* bs) {
 static void SetEnemyTarget(bot_state_t* bs) {
 	if (!IS_VALID_ENEMY(bs->currentEnemy)) {
 		gentity_t* newEnemy = BotFindBestAvailableEnemy(bs);
-		if (newEnemy != bs->currentEnemy) {
+		if (newEnemy != bs->currentEnemy || !bs->currentEnemy) {
 			bs->currentEnemy = newEnemy;
 			bs->wpToGoalCount = 0;
 			bs->currentPathWaypointIndex = 0;
+			bs->wpTravelTime = 0;
 
 			if (bs->currentEnemy) {
 				bs->frame_Enemy_Vis = 0;
 				bs->lastVisibleEnemyIndex = ENTITYNUM_NONE;
 			}
 		}
-		else if (!newEnemy) {
-			bs->currentEnemy = NULL;
-			bs->wpToGoalCount = 0;
-			bs->currentPathWaypointIndex = 0;
-		}
 	}
-	// If bs->currentEnemy was already valid and connected, it remains the target.
 }
 
 static wpobject_t* GetWaypointByIndex(int index) {
-	// Check index bounds first
 	if (index < 0 || index >= MAX_WPARRAY_SIZE) {
 		return NULL;
 	}
 
-	// Check if the pointer itself is NULL or if the pointed-to object is not in use.
 	if (!gWPArray[index] || !gWPArray[index]->inuse) {
 		return NULL;
 	}
@@ -5464,8 +5453,8 @@ static int GetNearestWaypoint(vec3_t origin, float max_search_dist) {
 	int i;
 	wpobject_t* wp;
 
-	for (i = 0; i < MAX_WPARRAY_SIZE; i++) { // Use MAX_WPARRAY_SIZE
-		wp = GetWaypointByIndex(i); // This will now use gWPArray internally
+	for (i = 0; i < MAX_WPARRAY_SIZE; i++) {
+		wp = GetWaypointByIndex(i);
 		if (wp) {
 			float dist_sq = DistanceSquared(origin, wp->origin);
 			if (dist_sq < best_dist_sq) {
@@ -5495,19 +5484,15 @@ static qboolean BotPathfindAStar(bot_state_t* bs, int startWaypointIndex, int go
 	wpobject_t* goalNode;
 	wpobject_t* currentNodeObj;
 	wpobject_t* neighborNodeObj;
-
-	// Variables for the main A* loop, declared at the top of the function or block for C89
 	int currentWaypointIndex;
 	float lowestFCost;
 	int openSetNodePos;
 	wpconnection_t* neighborConn;
 	int neighborIndex;
 	float tentativeGCost;
-
-	// tempPath is moved to static storage to reduce stack usage.
 	static int tempPath[MAX_WPARRAY_SIZE];
-	int pathIndex; // For reconstructing path
-	int curr;      // For reconstructing path
+	int pathIndex;
+	int curr;
 
 
 	startNode = GetWaypointByIndex(startWaypointIndex);
@@ -5623,6 +5608,9 @@ static qboolean BotPathfindAStar(bot_state_t* bs, int startWaypointIndex, int go
 
 static void Movement(bot_state_t* bs) {
 	wpobject_t* nextWp = NULL;
+	wpobject_t* newNextWp = NULL;
+	int startWpIndex;
+	int goalWpIndex;
 
 	if (bs->beStill > level.time) {
 		trap_EA_Move(bs->client, vec3_origin, 0); // Explicitly stop movement
@@ -5637,7 +5625,11 @@ static void Movement(bot_state_t* bs) {
 			needsPathRecalc = qtrue;
 		}
 		else {
-			if (bs->frame_Enemy_Len > 256 && !bs->frame_Enemy_Vis) {
+			if (bs->currentPathWaypointIndex < bs->wpToGoalCount &&
+				bs->wpTravelTime != 0 &&
+				level.time > bs->wpTravelTime) {
+				needsPathRecalc = qtrue;
+			} else if  (bs->frame_Enemy_Len > 256 && !bs->frame_Enemy_Vis) {
 				wpobject_t* lastPathWp = GetWaypointByIndex(bs->wpToGoal[bs->wpToGoalCount - 1]);
 				if (!lastPathWp || DistanceSquared(lastPathWp->origin, bs->currentEnemy->r.currentOrigin) > 400 * 400) {
 					needsPathRecalc = qtrue;
@@ -5646,11 +5638,26 @@ static void Movement(bot_state_t* bs) {
 		}
 
 		if (needsPathRecalc) {
-			int startWpIndex = GetNearestWaypoint(bs->origin, 200.0f);
-			int goalWpIndex = GetNearestWaypoint(bs->currentEnemy->r.currentOrigin, 200.0f);
+			bs->wpToGoalCount = 0;
+			bs->currentPathWaypointIndex = 0;
+			bs->wpTravelTime = 0;
+
+			startWpIndex = GetNearestWaypoint(bs->origin, 200.0f);
+			goalWpIndex = GetNearestWaypoint(bs->currentEnemy->r.currentOrigin, 200.0f);
 
 			if (startWpIndex != -1 && goalWpIndex != -1 && startWpIndex != goalWpIndex) {
-				BotPathfindAStar(bs, startWpIndex, goalWpIndex);
+				if (BotPathfindAStar(bs, startWpIndex, goalWpIndex)) {
+					if (bs->wpToGoalCount > 0) {
+						wpobject_t* firstWpInPath = GetWaypointByIndex(bs->wpToGoal[0]);
+						if (firstWpInPath) {
+							VectorCopy(firstWpInPath->origin, bs->goalPosition);
+							bs->wpTravelTime = level.time + BOT_WAYPOINT_TRAVEL_TIMEOUT;
+						}
+						else {
+							bs->wpToGoalCount = 0;
+						}
+					}
+				}
 			}
 			else {
 				bs->wpToGoalCount = 0;
@@ -5660,48 +5667,59 @@ static void Movement(bot_state_t* bs) {
 	else {
 		bs->wpToGoalCount = 0;
 		bs->currentPathWaypointIndex = 0;
+		bs->wpTravelTime = 0;
 	}
 
 	// --- Path Following Logic ---
 	if (bs->wpToGoalCount > 0 && bs->currentPathWaypointIndex < bs->wpToGoalCount) {
 		nextWp = GetWaypointByIndex(bs->wpToGoal[bs->currentPathWaypointIndex]);
+
 		if (nextWp) {
 			VectorCopy(nextWp->origin, bs->goalPosition);
 
 			if (DistanceSquared(bs->origin, bs->goalPosition) < 64 * 64) {
 				bs->currentPathWaypointIndex++;
+
 				if (bs->currentPathWaypointIndex >= bs->wpToGoalCount) {
 					bs->wpToGoalCount = 0;
+					bs->wpTravelTime = 0;
+
 					if (VectorCompare(bs->goalPosition, bs->origin)) {
 						trap_EA_Jump(bs->client);
 					}
+
 					VectorClear(bs->goalMovedir);
+
 					return;
 				}
-				if (bs->currentPathWaypointIndex < bs->wpToGoalCount) {
-					nextWp = GetWaypointByIndex(bs->wpToGoal[bs->currentPathWaypointIndex]);
-					if (nextWp) {
-						VectorCopy(nextWp->origin, bs->goalPosition);
-					}
-					else {
-						bs->wpToGoalCount = 0; VectorClear(bs->goalMovedir); return;
-					}
+
+				newNextWp = GetWaypointByIndex(bs->wpToGoal[bs->currentPathWaypointIndex]);
+				if (newNextWp) {
+					VectorCopy(newNextWp->origin, bs->goalPosition);
+					bs->wpTravelTime = level.time + BOT_WAYPOINT_TRAVEL_TIMEOUT; // Set travel time for the new segment
 				}
-				else {
-					bs->wpToGoalCount = 0; VectorClear(bs->goalMovedir); return;
+				else { // Invalid next waypoint in path
+					bs->wpToGoalCount = 0; 
+					bs->wpTravelTime = 0; 
+					VectorClear(bs->goalMovedir); 
+					
+					return;
 				}
 			}
 		}
 		else {
 			bs->wpToGoalCount = 0;
 			bs->currentPathWaypointIndex = 0;
+			bs->wpTravelTime = 0;
 		}
 	}
-	else if (IS_VALID_ENEMY(bs->currentEnemy) && bs->frame_Enemy_Vis && bs->frame_Enemy_Len < 512) {
+	else if (IS_VALID_ENEMY(bs->currentEnemy) && bs->frame_Enemy_Vis && bs->frame_Enemy_Len < 1024) {
 		VectorCopy(bs->currentEnemy->r.currentOrigin, bs->goalPosition);
+		bs->wpTravelTime = 0;
 	}
 	else {
 		VectorClear(bs->goalMovedir);
+		bs->wpTravelTime = 0;
 		return;
 	}
 
@@ -5886,10 +5904,12 @@ static void StandardBotAI(bot_state_t* bs, float thinktime) {
 	// --- 1. Global AI Deactivation Check ---
 	// If AI is globally deactivated, clear bot's targets and waypoints and do nothing further.
 	if (gDeactivated) {
-		bs->wpCurrent = NULL;       // Clear current waypoint
-		bs->currentEnemy = NULL;    // Clear current enemy
-		bs->wpDestination = NULL;   // Clear destination waypoint
-		bs->wpDirection = 0;        // Reset waypoint direction
+		bs->wpCurrent = NULL;
+		bs->currentEnemy = NULL;
+		bs->wpDestination = NULL;
+		bs->wpDirection = 0;
+		bs->wpToGoalCount = 0;
+		bs->wpTravelTime = 0;
 		return;
 	}
 
@@ -5913,6 +5933,7 @@ static void StandardBotAI(bot_state_t* bs, float thinktime) {
 		bs->wpDestination = NULL;
 		bs->wpDirection = 0;
 		bs->wpToGoalCount = 0;
+		bs->wpTravelTime = 0;
 		return;
 	}
 
@@ -5921,6 +5942,7 @@ static void StandardBotAI(bot_state_t* bs, float thinktime) {
 	// then return and let other logic proceed in a subsequent frame.
 	if (Respawn(bs)) {
 		bs->wpToGoalCount = 0;
+		bs->wpTravelTime = 0;
 		return;
 	}
 
