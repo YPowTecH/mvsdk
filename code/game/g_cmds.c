@@ -537,10 +537,7 @@ BroadCastTeamChange
 Let everyone know about a team change
 =================
 */
-void BroadcastTeamChange( gclient_t *client, int oldTeam )
-{
-	client->ps.fd.forceDoInit = 1; //every time we change teams make sure our force powers are set right
-
+void BroadcastTeamChange(gclient_t *client, int oldTeam) {
 	if ( client->sess.sessionTeam == TEAM_RED ) {
 		G_CenterPrint( -1, 3, va("%s" S_COLOR_WHITE " %s\n",
 			client->pers.netname, G_GetStripEdString("SVINGAME", "JOINEDTHEREDTEAM")) );
@@ -862,50 +859,6 @@ void Cmd_Team_f( gentity_t *ent ) {
 	SetTeam( ent, s );
 
 	ent->client->switchTeamTime = level.time + 5000;
-}
-
-/*
-=================
-Cmd_Team_f
-=================
-*/
-void Cmd_ForceChanged_f( gentity_t *ent )
-{
-	char fpChStr[1024];
-	const char *buf;
-//	Cmd_Kill_f(ent);
-	if (ent->client->sess.sessionTeam == TEAM_SPECTATOR)
-	{ //if it's a spec, just make the changes now
-		//trap_SendServerCommand( ent-g_entities, va("print \"%s\n\"", G_GetStripEdString("SVINGAME", "FORCEAPPLIED")) );
-		//No longer print it, as the UI calls this a lot.
-		WP_InitForcePowers( ent );
-		goto argCheck;
-	}
-
-	buf = G_GetStripEdString("SVINGAME", "FORCEPOWERCHANGED");
-
-	strcpy(fpChStr, buf);
-
-	trap_SendServerCommand( ent-g_entities, va("print \"%s%s\n\n\"", S_COLOR_GREEN, fpChStr) );
-
-	ent->client->ps.fd.forceDoInit = 1;
-argCheck:
-	if (g_gametype.integer == GT_TOURNAMENT)
-	{ //If this is duel, don't even bother changing team in relation to this.
-		return;
-	}
-
-	if (trap_Argc() > 1)
-	{
-		char	arg[MAX_TOKEN_CHARS];
-
-		trap_Argv( 1, arg, sizeof( arg ) );
-
-		if ( !Q_stricmp(arg, "none") || !Q_stricmp(arg, "same") || !Q_stricmp(arg, ";") ) return; // 1.02 clients send those and trigger unwanted team-changes...
-
-		//if there's an arg, assume it's a combo team command from the UI.
-		Cmd_Team_f(ent);
-	}
 }
 
 /*
@@ -2601,11 +2554,6 @@ void ClientCommand( int clientNum ) {
 		{
 			giveError = qtrue;
 		}
-		else if (!Q_stricmp(cmd, "forcechanged"))
-		{ //special case: still update force change
-			Cmd_ForceChanged_f (ent);
-			return;
-		}
 		else if (!Q_stricmp(cmd, "where"))
 		{
 			giveError = qtrue;
@@ -2674,8 +2622,6 @@ void ClientCommand( int clientNum ) {
 		Cmd_FollowCycle_f (ent, -1);
 	else if (Q_stricmp (cmd, "team") == 0)
 		Cmd_Team_f (ent);
-	else if (Q_stricmp (cmd, "forcechanged") == 0)
-		Cmd_ForceChanged_f (ent);
 	else if (Q_stricmp (cmd, "where") == 0)
 		Cmd_Where_f (ent);
 	else if (Q_stricmp (cmd, "callvote") == 0)

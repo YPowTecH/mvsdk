@@ -1310,7 +1310,7 @@ typedef struct forcedata_s {
 	int			forceDrainEntNum;
 	float		forceDrainTime;
 
-	int			forceDoInit;
+	int			forceDoInit; // PowTecH - No longer used but cant move or delete
 
 	int			forceSide;
 	int			forceRank;

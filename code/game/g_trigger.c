@@ -337,21 +337,21 @@ trigger_teleport
 ==============================================================================
 */
 
-void trigger_teleporter_touch (gentity_t *self, gentity_t *other, trace_t *trace ) {
-	gentity_t	*dest;
+void trigger_teleporter_touch (gentity_t* self, gentity_t* other, trace_t* trace) {
+	gentity_t* dest;
 
 	if ( !other->client ) {
 		return;
 	}
+
 	if ( other->client->ps.pm_type == PM_DEAD ) {
 		return;
 	}
-	// Spectators only?
-	if ( ( self->spawnflags & 1 ) && 
-		other->client->sess.sessionTeam != TEAM_SPECTATOR ) {
+
+	// Inactive trigger
+	if (self->spawnflags & 1) {
 		return;
 	}
-
 
 	dest = 	G_PickTarget( self->target );
 	if (!dest) {

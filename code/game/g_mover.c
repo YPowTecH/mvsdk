@@ -514,6 +514,10 @@ void Reached_BinaryMover( gentity_t *ent ) {
 
 		ent->s.loopSound = 0;
 
+		if (ent->spawnflags & 8) {
+			return;
+		}
+
 		// return to pos1 after a delay
 		ent->think = ReturnToPos1;
 		ent->nextthink = level.time + ent->wait;
@@ -525,10 +529,10 @@ void Reached_BinaryMover( gentity_t *ent ) {
 		}
 
 		// fire targets
-		if ( !ent->activator ) {
+		if (!ent->activator) {
 			ent->activator = ent;
 		}
-		G_UseTargets( ent, ent->activator );
+		G_UseTargets(ent, ent->activator);
 	} else if ( ent->moverState == MOVER_2TO1 ) {
 		// reached pos1
 		SetMoverState( ent, MOVER_POS1, level.time );
@@ -539,15 +543,17 @@ void Reached_BinaryMover( gentity_t *ent ) {
 		}
 
 		ent->s.loopSound = 0;
+		if (ent->spawnflags & 8) {
+			return;
+		}
 
-		if (ent->delay)
-		{ //it won't go back up again this way until after the delay
+		if (ent->delay) { //it won't go back up again this way until after the delay
 			ent->last_move_time = level.time + ent->delay;
 		}
 
 		// close areaportals
-		if ( ent->teammaster == ent || !ent->teammaster ) {
-			trap_AdjustAreaPortalState( ent, qfalse );
+		if (ent->teammaster == ent || !ent->teammaster) {
+			trap_AdjustAreaPortalState(ent, qfalse);
 		}
 	} else {
 		G_Error( "Reached_BinaryMover: bad moverState" );
@@ -571,6 +577,42 @@ void Use_BinaryMover( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 	}
 
 	ent->activator = activator;
+
+	if (ent->spawnflags & 8) {
+		if (ent->moverState == MOVER_POS1) {
+			MatchTeam(ent, MOVER_1TO2, level.time + 50);
+
+			// starting sound
+			if (ent->sound1to2) {
+				G_AddEvent(ent, EV_GENERAL_SOUND, ent->sound1to2);
+			}
+
+			// looping sound
+			ent->s.loopSound = ent->soundLoop;
+
+			// open areaportal
+			if (ent->teammaster == ent || !ent->teammaster) {
+				trap_AdjustAreaPortalState(ent, qtrue);
+			}
+			return;
+		} else if (ent->moverState == MOVER_POS2) {
+			MatchTeam(ent, MOVER_2TO1, level.time + 50);
+
+			// starting sound
+			if (ent->sound2to1) {
+				G_AddEvent(ent, EV_GENERAL_SOUND, ent->sound2to1);
+			}
+
+			// looping sound
+			ent->s.loopSound = ent->soundLoop;
+
+			// close areaportal
+			if (ent->teammaster == ent || !ent->teammaster) {
+				trap_AdjustAreaPortalState(ent, qfalse);
+			}
+			return;
+		}
+	}
 
 	if ( ent->moverState == MOVER_POS1 ) {
 		// start moving 50 msec later, becase if this was player
@@ -760,17 +802,23 @@ void Blocked_Door( gentity_t *ent, gentity_t *other ) {
 		return;
 	}
 
-	if ( ent->damage ) {
-		if (ent->activator && ent->activator->inuse && ent->activator->client)
-		{
-			G_Damage( other, ent->activator, ent->activator, NULL, NULL, ent->damage, DAMAGE_NO_ARMOR|DAMAGE_NO_PROTECTION, MOD_CRUSH );
-		}
-		else
-		{
-			G_Damage( other, ent, ent, NULL, NULL, ent->damage, DAMAGE_NO_ARMOR|DAMAGE_NO_PROTECTION, MOD_CRUSH );
+	if (ent->damage) {
+		if (ent->activator && ent->activator->inuse && ent->activator->client) {
+			if (ent->damage < 0) {
+				G_Damage(other, ent->activator, ent->activator, NULL, NULL, 99999, DAMAGE_NO_ARMOR | DAMAGE_NO_PROTECTION, MOD_CRUSH);
+			} else {
+				G_Damage(other, ent->activator, ent->activator, NULL, NULL, ent->damage, DAMAGE_NO_ARMOR | DAMAGE_NO_PROTECTION, MOD_CRUSH);
+			}
+		} else {
+			if (ent->damage < 0) {
+				G_Damage(other, ent, ent, NULL, NULL, 99999, DAMAGE_NO_ARMOR | DAMAGE_NO_PROTECTION, MOD_CRUSH);
+			} else {
+				G_Damage(other, ent, ent, NULL, NULL, ent->damage, DAMAGE_NO_ARMOR | DAMAGE_NO_PROTECTION, MOD_CRUSH);
+			}
 		}
 	}
-	if ( ent->spawnflags & 4 ) {
+
+	if (ent->spawnflags & 4) {
 		return;		// crushers don't reverse
 	}
 

@@ -1780,11 +1780,6 @@ void ClientSpawn(gentity_t *ent) {
 		}
 	}
 
-	if (client->ps.fd.forceDoInit)
-	{ //force a reread of force powers
-		WP_InitForcePowers( ent );
-		client->ps.fd.forceDoInit = 0;
-	}
 	// find a spawn point
 	// do it before setting health back up, so farthest
 	// ranging doesn't count this client

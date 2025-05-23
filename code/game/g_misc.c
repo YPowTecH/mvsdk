@@ -533,12 +533,6 @@ void SP_misc_holocron(gentity_t *ent)
 	vec3_t dest;
 	trace_t tr;
 
-	if (g_gametype.integer != GT_HOLOCRON)
-	{
-		G_FreeEntity(ent);
-		return;
-	}
-
 	if (HasSetSaberOnly())
 	{
 		if (ent->count == FP_SABERATTACK ||

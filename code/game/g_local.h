@@ -528,6 +528,7 @@ typedef struct {
 	// PowTecH
 	qboolean isWarmup;
 	int zCurrentTickets;
+	qboolean isDoorOpen;
 	//
 } level_locals_t;
 

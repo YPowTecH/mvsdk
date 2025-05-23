@@ -2401,36 +2401,136 @@ int g_TimeSinceLastFrame = 0;
 qboolean gDoSlowMoDuel = qfalse;
 int gSlowMoDuelTime = 0;
 
+// PowTecH - Start
+#define MAX_CANDIDATE_DOORS 256
 
-// PowTecH - Check Game State
+static void OpenDoor() {
+	gentity_t* ent = NULL;
+	gentity_t* candidate_doors[MAX_CANDIDATE_DOORS];
+	gentity_t* activator = NULL;
+	gentity_t* other = NULL;
+	gentity_t* door_to_open = NULL;
+	int i = 0;
+	int num_candidates = 0;
+	int random_index;
+
+	if (level.isDoorOpen) { return; }
+
+	for (i = 0; i < MAX_GENTITIES; i++) {
+		ent = &g_entities[i];
+
+		if (!ent || !ent->inuse || !ent->classname) {
+			continue;
+		}
+
+		if (strcmp(ent->classname, "func_door") == 0) {
+			// Check if the door is NOT in the fully open state (MOVER_POS2)
+			// We want to open doors that are closed (MOVER_POS1) or currently closing (MOVER_2TO1)
+			if (ent->moverState == MOVER_POS1 || ent->moverState == MOVER_2TO1) {
+				if (num_candidates < MAX_CANDIDATE_DOORS) {
+					candidate_doors[num_candidates] = ent;
+					num_candidates++;
+				}
+			}
+		} else if (strcmp(ent->classname, "trigger_teleport") == 0) {
+			G_Printf(S_COLOR_CYAN "found one\n");
+			if (!(ent->spawnflags & 1)) {
+				G_Printf(S_COLOR_CYAN "turn on\n");
+				ent->spawnflags |= 1;
+			}
+		}
+	}
+
+	if (num_candidates == 0) {
+		return;
+	}
+
+	// Select a random door from the candidates
+	// Ensure srand() has been called elsewhere (e.g., G_InitGame) for true randomness
+	random_index = rand() % num_candidates;
+	door_to_open = candidate_doors[random_index];
+
+	if (door_to_open && door_to_open->use) {
+		// Call the door's use function. For func_door, this is typically Use_BinaryMover.
+		// This should handle the logic for opening the door.
+		door_to_open->use(door_to_open, other, activator);
+		level.isDoorOpen = qtrue;
+	}
+}
+
+// TODO: PowTecH -
+// i need to put a trigger in the room, not just the floor in case they are jumping
+// - that will tp them out of the room
+static void CloseDoors() {
+	int i = 0;
+	gentity_t* ent;
+	gentity_t* activator = NULL;
+	gentity_t* other = NULL;
+
+	for (i = 0; i < MAX_GENTITIES; i++) {
+		ent = &g_entities[i];
+
+		if (!ent || !ent->inuse || !ent->classname) {
+			continue;
+		}
+
+		if (strcmp(ent->classname, "func_door") == 0) {
+			// Check if the door is NOT in the fully closed state (MOVER_POS1)
+			// We want to close doors that are open (MOVER_POS2) or currently opening (MOVER_1TO2)
+			if (ent->moverState == MOVER_POS2 || ent->moverState == MOVER_1TO2) {
+				if (ent->use) {
+					// Call the door's use function.
+					// This should handle the logic for closing the door (e.g., if it's open and toggleable,
+					// or if its 'wait' timer would normally make it close).
+					ent->use(ent, other, activator);
+				}
+			}
+		}
+		else if (strcmp(ent->classname, "trigger_teleport") == 0) {
+			G_Printf(S_COLOR_CYAN "found two\n");
+			if (ent->spawnflags & 1) {
+				G_Printf(S_COLOR_CYAN "turn off\n");
+				ent->spawnflags &= ~1;
+			}
+		}
+	}
+
+	level.isDoorOpen = qfalse;
+}
+
 static void CheckGameState() {
 	// Warmup
 	if (level.isWarmup) {
 		qboolean notEnough = qfalse;
 
-		if (G_CountHumanPlayers(TEAM_FREE) == 0) {
+		// Dont start unless we have players in the server
+		if (G_CountHumanPlayers(TEAM_FREE) <= 0) {
 			level.warmupTime = -1;
 			trap_SetConfigstring(CS_WARMUP, va("%i", level.warmupTime));
 			return;
 		}
 
+		// If we have players in the server we can start the warmup time
 		if (level.warmupTime < 0) {
 			level.warmupTime = level.time + (g_warmup.integer - 1) * 1000;
 			trap_SetConfigstring(CS_WARMUP, va("%i", level.warmupTime));
+			OpenDoor();
 			return;
 		}
 
-		// if the warmup is changed at the console, restart it
+		// If the warmup time is changed at the console, restart it
 		if (g_warmup.modificationCount != level.warmupModificationCount) {
 			level.warmupModificationCount = g_warmup.modificationCount;
 			level.warmupTime = -1;
 			return;
 		}
 
+		// If warmup time is over then end the warmup and reset the tickets
 		if (level.time > level.warmupTime) {
 			level.warmupTime = -1;
 			level.isWarmup = qfalse;
 			level.zCurrentTickets = 2;
+			CloseDoors();
 			return;
 		}
 	}
@@ -2445,7 +2545,7 @@ static void CheckGameState() {
 	//	return;
 	//}
 }
-//
+// PowTecH - End
 
 /*
 ================
