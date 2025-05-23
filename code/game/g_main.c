@@ -2419,13 +2419,18 @@ static void OpenDoor() {
 	for (i = 0; i < MAX_GENTITIES; i++) {
 		ent = &g_entities[i];
 
-		if (!ent || !ent->inuse || !ent->classname) {
+		if (!ent) {
+			continue;
+		}
+
+		if (ent->inuse && ent->client && !(ent->r.svFlags & SVF_BOT)) {
+			ent->client->pers.zScore = ent->client->ps.persistant[PERS_SCORE];
+			ent->client->ps.persistant[PERS_SCORE] = ent->client->pers.zDosh;
+			CalculateRanks();
 			continue;
 		}
 
 		if (strcmp(ent->classname, "func_door") == 0) {
-			// Check if the door is NOT in the fully open state (MOVER_POS2)
-			// We want to open doors that are closed (MOVER_POS1) or currently closing (MOVER_2TO1)
 			if (ent->moverState == MOVER_POS1 || ent->moverState == MOVER_2TO1) {
 				if (num_candidates < MAX_CANDIDATE_DOORS) {
 					candidate_doors[num_candidates] = ent;
@@ -2433,9 +2438,7 @@ static void OpenDoor() {
 				}
 			}
 		} else if (strcmp(ent->classname, "trigger_teleport") == 0) {
-			G_Printf(S_COLOR_CYAN "found one\n");
 			if (!(ent->spawnflags & 1)) {
-				G_Printf(S_COLOR_CYAN "turn on\n");
 				ent->spawnflags |= 1;
 			}
 		}
@@ -2445,22 +2448,15 @@ static void OpenDoor() {
 		return;
 	}
 
-	// Select a random door from the candidates
-	// Ensure srand() has been called elsewhere (e.g., G_InitGame) for true randomness
 	random_index = rand() % num_candidates;
 	door_to_open = candidate_doors[random_index];
 
 	if (door_to_open && door_to_open->use) {
-		// Call the door's use function. For func_door, this is typically Use_BinaryMover.
-		// This should handle the logic for opening the door.
 		door_to_open->use(door_to_open, other, activator);
 		level.isDoorOpen = qtrue;
 	}
 }
 
-// TODO: PowTecH -
-// i need to put a trigger in the room, not just the floor in case they are jumping
-// - that will tp them out of the room
 static void CloseDoors() {
 	int i = 0;
 	gentity_t* ent;
@@ -2470,26 +2466,25 @@ static void CloseDoors() {
 	for (i = 0; i < MAX_GENTITIES; i++) {
 		ent = &g_entities[i];
 
-		if (!ent || !ent->inuse || !ent->classname) {
+		if (!ent) {
+			continue;
+		}
+
+		if (ent->inuse && ent->client && !(ent->r.svFlags & SVF_BOT)) {
+			ent->client->pers.zDosh = ent->client->ps.persistant[PERS_SCORE];
+			ent->client->ps.persistant[PERS_SCORE] = ent->client->pers.zScore;
 			continue;
 		}
 
 		if (strcmp(ent->classname, "func_door") == 0) {
-			// Check if the door is NOT in the fully closed state (MOVER_POS1)
-			// We want to close doors that are open (MOVER_POS2) or currently opening (MOVER_1TO2)
 			if (ent->moverState == MOVER_POS2 || ent->moverState == MOVER_1TO2) {
 				if (ent->use) {
-					// Call the door's use function.
-					// This should handle the logic for closing the door (e.g., if it's open and toggleable,
-					// or if its 'wait' timer would normally make it close).
 					ent->use(ent, other, activator);
 				}
 			}
 		}
 		else if (strcmp(ent->classname, "trigger_teleport") == 0) {
-			G_Printf(S_COLOR_CYAN "found two\n");
 			if (ent->spawnflags & 1) {
-				G_Printf(S_COLOR_CYAN "turn off\n");
 				ent->spawnflags &= ~1;
 			}
 		}

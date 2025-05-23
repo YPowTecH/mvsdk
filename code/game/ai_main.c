@@ -5351,11 +5351,14 @@ static qboolean Respawn(bot_state_t* bs) {
 			else if (bs->deathActivitiesDone && level.time >= bot_ent->client->respawnTime) {
 				if (level.zCurrentTickets > 0) {
 					level.zCurrentTickets--;
+
 					respawn(bot_ent);
 				}
 				else {
 					SetTeam(bot_ent, "spectator");
 				}
+
+				bs->lastHurt->client->pers.zDosh += 25;
 
 				UpdateGameState();
 
