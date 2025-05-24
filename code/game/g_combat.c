@@ -561,6 +561,7 @@ TossClientItems
 rww - Toss the weapon away from the player in the specified direction
 =================
 */
+// PowTecH - TODO: For later - could toss dosh this way x)
 void TossClientWeapon(gentity_t *self, vec3_t direction, float speed)
 {
 	vec3_t vel;

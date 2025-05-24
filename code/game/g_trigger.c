@@ -16,12 +16,10 @@ void InitTrigger( gentity_t *self ) {
 	MV_ModelindexToTime2( self );
 }
 
-
 // the wait time has passed, so set back up for another activation
 void multi_wait( gentity_t *ent ) {
 	ent->nextthink = 0;
 }
-
 
 // the trigger was just activated
 // ent->activator should be set to the activator so it can be held through a delay
@@ -55,17 +53,6 @@ void multi_trigger( gentity_t *ent, gentity_t *activator ) {
 	ent->activator = activator;
 	if ( ent->nextthink ) {
 		return;		// can't retrigger until the wait is over
-	}
-
-	if ( activator && activator->client ) {
-		if ( ( ent->spawnflags & 2 ) &&
-			activator->client->sess.sessionTeam != TEAM_RED ) {
-			return;
-		}
-		if ( ( ent->spawnflags & 4 ) &&
-			activator->client->sess.sessionTeam != TEAM_BLUE ) {
-			return;
-		}
 	}
 
 	G_UseTargets (ent, ent->activator);

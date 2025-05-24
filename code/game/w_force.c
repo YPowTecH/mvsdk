@@ -142,7 +142,7 @@ int forcePowerMinRank[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS] = //0 == neutral
 
 void WP_InitForcePowers(gentity_t* ent) {
 	ent->client->ps.fd.forcePowersKnown |= (1 << FP_FIRST);
-	ent->client->ps.fd.forcePowerLevel[FP_FIRST] = FORCE_LEVEL_1;
+	ent->client->ps.fd.forcePowerLevel[FP_FIRST] = FORCE_LEVEL_2;
 	ent->client->ps.fd.forcePowersKnown |= (1 << FP_LEVITATION);
 	ent->client->ps.fd.forcePowerLevel[FP_LEVITATION] = FORCE_LEVEL_1;
 	ent->client->ps.fd.forcePowersKnown |= (1 << FP_SABERATTACK);

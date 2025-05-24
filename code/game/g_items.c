@@ -1370,20 +1370,20 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	int			respawn;
 	qboolean	predict;
 
-	if (ent->s.eFlags & EF_ITEMPLACEHOLDER)
-	{
+	if (ent->s.eFlags & EF_ITEMPLACEHOLDER) {
 		return;
 	}
 
-	if (ent->s.eFlags & EF_NODRAW)
-	{
-		return;
-	}
+	// PowTecH - Commented to make target_give work
+	// - can not remain like this if you want to spawn items in the worl
+	// - that can be picked up multiple times
+	//if (ent->s.eFlags & EF_NODRAW) {
+	//	return;
+	//}
 
 	if (ent->item->giType == IT_WEAPON &&
 		ent->s.powerups &&
-		ent->s.powerups < level.time)
-	{
+		ent->s.powerups < level.time) {
 		ent->s.generic1 = 0;
 		ent->s.powerups = 0;
 	}

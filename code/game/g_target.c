@@ -25,6 +25,39 @@ void Use_Target_Give( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 		if ( !t->item ) {
 			continue;
 		}
+
+		switch (t->item->giType) {
+		case IT_HEALTH:
+			activator->client->ps.stats[STAT_HEALTH] += 25;
+
+			continue;
+		case IT_ARMOR:
+			if (activator->client->ps.persistant[PERS_SCORE] < 50 ||
+				activator->client->ps.stats[STAT_ARMOR] >= 100) {
+				continue;
+			}
+
+			activator->client->ps.persistant[PERS_SCORE] -= 50;
+			activator->client->ps.stats[STAT_ARMOR] += 25;
+			CalculateRanks();
+
+			continue;
+		case IT_WEAPON:
+			if (t->item->giTag != WP_SABER ||
+				activator->client->ps.persistant[PERS_SCORE] < 1 ||
+				activator->client->ps.fd.forcePowerLevel[FP_SABERATTACK] == FORCE_LEVEL_2) {
+				continue;
+			}
+
+			activator->client->ps.persistant[PERS_SCORE] -= 250;
+			activator->client->ps.fd.forcePowerLevel[FP_SABERATTACK] = FORCE_LEVEL_2;
+			CalculateRanks();
+
+			continue;
+		default:
+			break;
+		}
+
 		Touch_Item( t, activator, &trace );
 
 		// make sure it isn't going to respawn or show any events
