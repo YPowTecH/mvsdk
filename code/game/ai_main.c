@@ -5499,15 +5499,11 @@ static void Movement(bot_state_t* bs) {
 			if (bs->currentPathWaypointIndex < bs->wpToGoalCount &&
 				bs->wpTravelTime != 0 &&
 				level.time > bs->wpTravelTime) {
-				G_Printf(S_COLOR_GREEN "took too long\n");
+				if (Q_irand(0, 1) == 0) {
+					trap_EA_Jump(bs->client);
+				}
 				needsPathRecalc = qtrue;
-			} 
-			//else if  (bs->frame_Enemy_Len > 1024 && !bs->frame_Enemy_Vis) {
-			//	wpobject_t* lastPathWp = GetWaypointByIndex(bs->wpToGoal[bs->wpToGoalCount - 1]);
-			//	if (!lastPathWp || DistanceSquared(lastPathWp->origin, bs->currentEnemy->r.currentOrigin) > 400 * 400) {
-			//		needsPathRecalc = qtrue;
-			//	}
-			//}
+			}
 		}
 
 		if (needsPathRecalc) {
@@ -5607,7 +5603,6 @@ static void Movement(bot_state_t* bs) {
 
 	// Issue the move command if there's a direction
 	if (VectorLengthSquared(bs->goalMovedir) > 0.1f) {
-		//trap_EA_Move(bs->client, bs->goalMovedir, 300);
 		trap_EA_Move(bs->client, bs->goalMovedir, 5000);
 	}
 }
