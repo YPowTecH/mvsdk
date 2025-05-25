@@ -95,7 +95,7 @@ gentity_t *droppedBlueFlag;
      (enemy_ptr)->client->sess.sessionTeam != TEAM_SPECTATOR)
 
 #define ASTAR_INFINITE_COST 999999.0f
-#define BOT_WAYPOINT_TRAVEL_TIMEOUT 1000
+#define BOT_WAYPOINT_TRAVEL_TIMEOUT 1500
 
 typedef struct astar_node_data_s {
 	int parentWaypointIndex;    // Index of the waypoint this node came from
@@ -4325,146 +4325,6 @@ int ShouldSecondaryFire(bot_state_t *bs)
 	return 0;
 }
 
-int CombatBotAI(bot_state_t *bs, float thinktime)
-{
-	vec3_t eorg, a;
-	int secFire;
-	float fovcheck;
-
-	if (!bs->currentEnemy)
-	{
-		return 0;
-	}
-
-	if (bs->currentEnemy->client)
-	{
-		VectorCopy(bs->currentEnemy->client->ps.origin, eorg);
-	}
-	else
-	{
-		VectorCopy(bs->currentEnemy->s.origin, eorg);
-	}
-
-	VectorSubtract(eorg, bs->eye, a);
-	vectoangles(a, a);
-
-	if (BotGetWeaponRange(bs) == BWEAPONRANGE_SABER)
-	{
-		if (bs->frame_Enemy_Len <= SABER_ATTACK_RANGE)
-		{
-			bs->doAttack = 1;
-		}
-	}
-	else if (BotGetWeaponRange(bs) == BWEAPONRANGE_MELEE)
-	{
-		if (bs->frame_Enemy_Len <= MELEE_ATTACK_RANGE)
-		{
-			bs->doAttack = 1;
-		}
-	}
-	else
-	{
-		if (bs->cur_ps.weapon == WP_THERMAL || bs->cur_ps.weapon == WP_ROCKET_LAUNCHER)
-		{ //be careful with the hurty weapons
-			fovcheck = 40;
-
-			if (bs->cur_ps.weaponstate == WEAPON_CHARGING_ALT &&
-				bs->cur_ps.weapon == WP_ROCKET_LAUNCHER)
-			{ //if we're charging the weapon up then we can hold fire down within a normal fov
-				fovcheck = 60;
-			}
-		}
-		else
-		{
-			fovcheck = 60;
-		}
-
-		if (bs->cur_ps.weaponstate == WEAPON_CHARGING ||
-			bs->cur_ps.weaponstate == WEAPON_CHARGING_ALT)
-		{
-			fovcheck = 160;
-		}
-
-		if (bs->frame_Enemy_Len < 128)
-		{
-			fovcheck *= 2;
-		}
-
-		if (InFieldOfVision(bs->viewangles, fovcheck, a))
-		{
-			if (bs->cur_ps.weapon == WP_THERMAL)
-			{
-				if (((level.time - bs->cur_ps.weaponChargeTime) < (bs->frame_Enemy_Len*2) &&
-					(level.time - bs->cur_ps.weaponChargeTime) < 4000 &&
-					bs->frame_Enemy_Len > 64) ||
-					(bs->cur_ps.weaponstate != WEAPON_CHARGING &&
-					bs->cur_ps.weaponstate != WEAPON_CHARGING_ALT))
-				{
-					if (bs->cur_ps.weaponstate != WEAPON_CHARGING && bs->cur_ps.weaponstate != WEAPON_CHARGING_ALT)
-					{
-						if (bs->frame_Enemy_Len > 512 && bs->frame_Enemy_Len < 800)
-						{
-							bs->doAltAttack = 1;
-							//bs->doAttack = 1;
-						}
-						else
-						{
-							bs->doAttack = 1;
-							//bs->doAltAttack = 1;
-						}
-					}
-
-					if (bs->cur_ps.weaponstate == WEAPON_CHARGING)
-					{
-						bs->doAttack = 1;
-					}
-					else if (bs->cur_ps.weaponstate == WEAPON_CHARGING_ALT)
-					{
-						bs->doAltAttack = 1;
-					}
-				}
-			}
-			else
-			{
-				secFire = ShouldSecondaryFire(bs);
-
-				if (bs->cur_ps.weaponstate != WEAPON_CHARGING_ALT &&
-					bs->cur_ps.weaponstate != WEAPON_CHARGING)
-				{
-					bs->altChargeTime = Q_irand(500, 1000);
-				}
-
-				if (secFire == 1)
-				{
-					bs->doAltAttack = 1;
-				}
-				else if (!secFire)
-				{
-					if (bs->cur_ps.weapon != WP_THERMAL)
-					{
-						if (bs->cur_ps.weaponstate != WEAPON_CHARGING ||
-							bs->altChargeTime > (level.time - bs->cur_ps.weaponChargeTime))
-						{
-							bs->doAttack = 1;
-						}
-					}
-					else
-					{
-						bs->doAttack = 1;
-					}
-				}
-
-				if (secFire == 2)
-				{ //released a charge
-					return 1;
-				}
-			}
-		}
-	}
-
-	return 0;
-}
-
 int BotFallbackNavigation(bot_state_t *bs)
 {
 	vec3_t b_angle, fwd, trto, mins, maxs;
@@ -5316,8 +5176,8 @@ static void RespawnResetState(bot_state_t* bs) {
 	bs->currentPathWaypointIndex = 0;
 
 	// Reset the attack states
-	bs->doAttack = qfalse;
-	bs->doAltAttack = qfalse;
+	bs->doAttack = 0;
+	bs->doAltAttack = 0;
 
 	// Reset other combat/movement states
 	bs->frame_Enemy_Vis = 0;
@@ -5404,10 +5264,11 @@ static qboolean Respawn(bot_state_t* bs) {
 }
 
 static gentity_t* BotFindBestAvailableEnemy(bot_state_t* bs) {
+	int i;
 	gentity_t* ent = NULL;
 	gentity_t* bestEnemy = NULL;
-	int i;
 	gentity_t* self_ent = &g_entities[bs->client];
+	float closestDistanceSq = -1.0f;
 
 	for (i = 0; i < MAX_CLIENTS; i++) {
 		ent = &g_entities[i];
@@ -5415,8 +5276,12 @@ static gentity_t* BotFindBestAvailableEnemy(bot_state_t* bs) {
 			ent->s.number != bs->client &&
 			!OnSameTeam(ent, self_ent))
 		{
-			bestEnemy = ent;
-			break;
+			float distSq = DistanceSquared(bs->origin, ent->client->ps.origin);
+
+			if (closestDistanceSq < 0.0f || distSq < closestDistanceSq) {
+				closestDistanceSq = distSq;
+				bestEnemy = ent;
+			}
 		}
 	}
 	return bestEnemy;
@@ -5451,18 +5316,21 @@ static wpobject_t* GetWaypointByIndex(int index) {
 }
 
 static int GetNearestWaypoint(vec3_t origin, float max_search_dist) {
+	int i;
 	int best_wp_index = -1;
 	float best_dist_sq = max_search_dist * max_search_dist;
-	int i;
+	float dist_sq;
 	wpobject_t* wp;
 
 	for (i = 0; i < MAX_WPARRAY_SIZE; i++) {
 		wp = GetWaypointByIndex(i);
 		if (wp) {
-			float dist_sq = DistanceSquared(origin, wp->origin);
+			dist_sq = DistanceSquared(origin, wp->origin);
 			if (dist_sq < best_dist_sq) {
-				best_dist_sq = dist_sq;
-				best_wp_index = i;
+				if (OrgVisible(origin, wp->origin, ENTITYNUM_NONE)) {
+					best_dist_sq = dist_sq;
+					best_wp_index = i;
+				}
 			}
 		}
 	}
@@ -5631,19 +5499,19 @@ static void Movement(bot_state_t* bs) {
 			if (bs->currentPathWaypointIndex < bs->wpToGoalCount &&
 				bs->wpTravelTime != 0 &&
 				level.time > bs->wpTravelTime) {
+				G_Printf(S_COLOR_GREEN "took too long\n");
 				needsPathRecalc = qtrue;
-			} else if  (bs->frame_Enemy_Len > 256 && !bs->frame_Enemy_Vis) {
-				wpobject_t* lastPathWp = GetWaypointByIndex(bs->wpToGoal[bs->wpToGoalCount - 1]);
-				if (!lastPathWp || DistanceSquared(lastPathWp->origin, bs->currentEnemy->r.currentOrigin) > 400 * 400) {
-					needsPathRecalc = qtrue;
-				}
-			}
+			} 
+			//else if  (bs->frame_Enemy_Len > 1024 && !bs->frame_Enemy_Vis) {
+			//	wpobject_t* lastPathWp = GetWaypointByIndex(bs->wpToGoal[bs->wpToGoalCount - 1]);
+			//	if (!lastPathWp || DistanceSquared(lastPathWp->origin, bs->currentEnemy->r.currentOrigin) > 400 * 400) {
+			//		needsPathRecalc = qtrue;
+			//	}
+			//}
 		}
 
 		if (needsPathRecalc) {
-			bs->wpToGoalCount = 0;
-			bs->currentPathWaypointIndex = 0;
-			bs->wpTravelTime = 0;
+			SetEnemyTarget(bs);
 
 			startWpIndex = GetNearestWaypoint(bs->origin, 200.0f);
 			goalWpIndex = GetNearestWaypoint(bs->currentEnemy->r.currentOrigin, 200.0f);
@@ -5711,16 +5579,18 @@ static void Movement(bot_state_t* bs) {
 			}
 		}
 		else {
+			G_Printf(S_COLOR_RED "no wp\n");
 			bs->wpToGoalCount = 0;
 			bs->currentPathWaypointIndex = 0;
 			bs->wpTravelTime = 0;
 		}
 	}
-	else if (IS_VALID_ENEMY(bs->currentEnemy) && bs->frame_Enemy_Vis && bs->frame_Enemy_Len < 1024) {
+	else if (IS_VALID_ENEMY(bs->currentEnemy)) {
 		VectorCopy(bs->currentEnemy->r.currentOrigin, bs->goalPosition);
 		bs->wpTravelTime = 0;
 	}
 	else {
+		G_Printf(S_COLOR_YELLOW "no enemy just travel in a direction i guess\n");
 		VectorClear(bs->goalMovedir);
 		bs->wpTravelTime = 0;
 		return;
@@ -5742,120 +5612,199 @@ static void Movement(bot_state_t* bs) {
 	}
 }
 
-static void AimAtEnemy(bot_state_t* bs, float thinktime) {
-	vec3_t enemyHeadPos;                // Stores the calculated head position of the enemy
-	vec3_t vecToTarget;                 // Vector from bot's eye to the target
-	vec3_t aimAngles;                   // Temporary storage for calculated aim angles
-	float leadAmount;
-	float skillRatio;
-	float distToLastSpot;
-	vec3_t enemyMovementSinceSpotted;
+static int CombatBotAI(bot_state_t* bs, float thinktime) {
+	vec3_t eorg, a;
+	int secFire;
+	float fovcheck;
 
-	// --- 1. Initial Validation: Current Enemy ---
-	// If there's no current enemy, or the enemy is not a client entity or not connected,
-	// reset relevant state and exit. SetEnemyTarget should have handled finding an enemy.
-	if (!IS_VALID_ENEMY(bs->currentEnemy)) {
-		bs->lastVisibleEnemyIndex = ENTITYNUM_NONE;
-		bs->frame_Enemy_Vis = 0; // Mark enemy as not visible
-		// Optionally clear goal angles if no enemy
-		// VectorClear(bs->goalAngles); 
-		return;
+	if (!bs->currentEnemy) {
+		return 0;
 	}
 
-	// --- 2. Calculate Current Enemy Head Position & Distance ---
-	VectorCopy(bs->currentEnemy->client->ps.origin, enemyHeadPos);
-	enemyHeadPos[2] += bs->currentEnemy->client->ps.viewheight;
-	VectorSubtract(enemyHeadPos, bs->eye, vecToTarget);
-	bs->frame_Enemy_Len = VectorLength(vecToTarget);
-
-	// --- 3. Check Current Visibility & Update Bot's Knowledge ---
-	if (OrgVisible(bs->eye, enemyHeadPos, bs->client)) { // bs->client is bot's own entity num for passEntities
-		bs->frame_Enemy_Vis = 1;
-		VectorCopy(enemyHeadPos, bs->lastEnemySpotted);
-		VectorCopy(bs->origin, bs->hereWhenSpotted);
-		bs->lastVisibleEnemyIndex = bs->currentEnemy->s.number;
-		bs->hitSpotted = 0;
-		bs->enemySeenTime = level.time + ENEMY_FORGET_MS;
+	if (bs->currentEnemy->client) {
+		VectorCopy(bs->currentEnemy->client->ps.origin, eorg);
 	}
 	else {
-		bs->frame_Enemy_Vis = 0;
+		VectorCopy(bs->currentEnemy->s.origin, eorg);
 	}
 
-	// --- 4. Reaction Time & Engagement Check ---
-	// Check if bot is still in reaction delay or has "forgotten" the enemy.
-	// ENEMY_FORGET_MS * 0.8f means 20% of forget time has passed since last seen.
-	if (bs->timeToReact >= level.time || bs->enemySeenTime <= (level.time + (ENEMY_FORGET_MS * 0.8f))) {
-		// If enemy is not visible, and we are in this state, don't aim at last known spot yet.
-		// If enemy IS visible, CombatBotAI was NOT called in original logic at this stage.
-		// The bot might be aware but not fully reacting/aiming yet.
-		// Consider if goalAngles should be cleared or maintained.
-		return;
-	}
+	VectorSubtract(eorg, bs->eye, a);
+	vectoangles(a, a);
 
-	// --- 5. Active Combat AI & Aiming (If Enemy is Currently Visible) ---
-	if (bs->frame_Enemy_Vis) {
-		CombatBotAI(bs, thinktime); // Perform main combat decision-making
-
-		leadAmount = BotWeaponCanLead(bs);
-		skillRatio = 0.0f;
-
-		if (bs->settings.skill != 0.0f) { // Prevent division by zero
-			skillRatio = bs->skills.accuracy / bs->settings.skill;
-		}
-
-		if (leadAmount > 0.0f && skillRatio <= 8.0f) { // Arbitrary skill threshold
-			BotAimLeading(bs, enemyHeadPos, leadAmount); // This function should set bs->goalAngles
+	if (BotGetWeaponRange(bs) == BWEAPONRANGE_SABER) {
+		if (bs->frame_Enemy_Len > 0 && bs->frame_Enemy_Len <= SABER_ATTACK_RANGE) {
+			bs->doAttack = 1;
 		}
 		else {
-			// No leading: aim directly. vecToTarget is already (enemyHeadPos - bs->eye).
-			vectoangles(vecToTarget, aimAngles);
-			VectorCopy(aimAngles, bs->goalAngles);
+			bs->doAttack = 0;
 		}
-		BotAimOffsetGoalAngles(bs); // Apply final aim adjustments
-
-		// PowTecH - Make the bot rotate
-		VectorCopy(bs->goalAngles, bs->ideal_viewangles);
-		return;
 	}
-
-	// --- 6. Aiming at Last Known Position (If Enemy is NOT Currently Visible but remembered) ---
-	// This block executes if enemy not currently visible AND bot is past reaction/partial forgetfulness.
-	if (OrgVisible(bs->eye, bs->lastEnemySpotted, ENTITYNUM_NONE)) { // Check LOS to last spot
-		VectorSubtract(bs->lastEnemySpotted, bs->eye, vecToTarget);
-		vectoangles(vecToTarget, aimAngles);
-		VectorCopy(aimAngles, bs->goalAngles);
-
-		// Specific logic for Flechette gun when aiming at last known position
-		if (bs->cur_ps.weapon == WP_FLECHETTE &&
-			bs->cur_ps.weaponstate == WEAPON_READY &&
-			IS_VALID_ENEMY(bs->currentEnemy)) // Re-check for safety
+	else if (BotGetWeaponRange(bs) == BWEAPONRANGE_MELEE)
+	{
+		if (bs->frame_Enemy_Len <= MELEE_ATTACK_RANGE)
 		{
-			distToLastSpot = VectorLength(vecToTarget);
+			bs->doAttack = 1;
+		}
+	}
+	else
+	{
+		if (bs->cur_ps.weapon == WP_THERMAL || bs->cur_ps.weapon == WP_ROCKET_LAUNCHER)
+		{ //be careful with the hurty weapons
+			fovcheck = 40;
 
-			if (distToLastSpot > 128.0f && distToLastSpot < 1024.0f) {
-				VectorSubtract(bs->currentEnemy->client->ps.origin, bs->lastEnemySpotted, enemyMovementSinceSpotted);
-				if (VectorLength(enemyMovementSinceSpotted) < 300.0f) {
-					bs->doAltAttack = qtrue;
+			if (bs->cur_ps.weaponstate == WEAPON_CHARGING_ALT &&
+				bs->cur_ps.weapon == WP_ROCKET_LAUNCHER)
+			{ //if we're charging the weapon up then we can hold fire down within a normal fov
+				fovcheck = 60;
+			}
+		}
+		else
+		{
+			fovcheck = 60;
+		}
+
+		if (bs->cur_ps.weaponstate == WEAPON_CHARGING ||
+			bs->cur_ps.weaponstate == WEAPON_CHARGING_ALT)
+		{
+			fovcheck = 160;
+		}
+
+		if (bs->frame_Enemy_Len < 128)
+		{
+			fovcheck *= 2;
+		}
+
+		if (InFieldOfVision(bs->viewangles, fovcheck, a))
+		{
+			if (bs->cur_ps.weapon == WP_THERMAL)
+			{
+				if (((level.time - bs->cur_ps.weaponChargeTime) < (bs->frame_Enemy_Len * 2) &&
+					(level.time - bs->cur_ps.weaponChargeTime) < 4000 &&
+					bs->frame_Enemy_Len > 64) ||
+					(bs->cur_ps.weaponstate != WEAPON_CHARGING &&
+						bs->cur_ps.weaponstate != WEAPON_CHARGING_ALT))
+				{
+					if (bs->cur_ps.weaponstate != WEAPON_CHARGING && bs->cur_ps.weaponstate != WEAPON_CHARGING_ALT)
+					{
+						if (bs->frame_Enemy_Len > 512 && bs->frame_Enemy_Len < 800)
+						{
+							bs->doAltAttack = 1;
+							//bs->doAttack = 1;
+						}
+						else
+						{
+							bs->doAttack = 1;
+							//bs->doAltAttack = 1;
+						}
+					}
+
+					if (bs->cur_ps.weaponstate == WEAPON_CHARGING)
+					{
+						bs->doAttack = 1;
+					}
+					else if (bs->cur_ps.weaponstate == WEAPON_CHARGING_ALT)
+					{
+						bs->doAltAttack = 1;
+					}
+				}
+			}
+			else
+			{
+				secFire = ShouldSecondaryFire(bs);
+
+				if (bs->cur_ps.weaponstate != WEAPON_CHARGING_ALT &&
+					bs->cur_ps.weaponstate != WEAPON_CHARGING)
+				{
+					bs->altChargeTime = Q_irand(500, 1000);
+				}
+
+				if (secFire == 1)
+				{
+					bs->doAltAttack = 1;
+				}
+				else if (!secFire)
+				{
+					if (bs->cur_ps.weapon != WP_THERMAL)
+					{
+						if (bs->cur_ps.weaponstate != WEAPON_CHARGING ||
+							bs->altChargeTime > (level.time - bs->cur_ps.weaponChargeTime))
+						{
+							bs->doAttack = 1;
+						}
+					}
+					else
+					{
+						bs->doAttack = 1;
+					}
+				}
+
+				if (secFire == 2)
+				{ //released a charge
+					return 1;
 				}
 			}
 		}
 	}
-	else {
-		// Last known spot is not visible, don't aim there.
-		// Optionally, make the bot look forward or in a search pattern.
-		// For now, goalAngles remain as they were (potentially from a previous visible state or cleared).
+
+	return 0;
+}
+
+static void FinalAim(bot_state_t* bs, vec3_t vecToTarget, float thinktime) {
+	vec3_t aimAngles;
+
+	CombatBotAI(bs, thinktime);
+	vectoangles(vecToTarget, aimAngles);
+	VectorCopy(aimAngles, bs->goalAngles);
+
+	//BotAimOffsetGoalAngles(bs);
+
+	// PowTecH - Make the bot rotate
+	VectorCopy(bs->goalAngles, bs->ideal_viewangles);
+}
+
+static void AimAtEnemy(bot_state_t* bs, float thinktime) {
+	vec3_t targetPosition;
+	vec3_t vecToTarget;
+	wpobject_t* nextWp = NULL;
+
+	// 1. Try to aim at the current enemy if valid and visible
+	if (IS_VALID_ENEMY(bs->currentEnemy)) {
+		vec3_t enemyHeadPos;
+		VectorCopy(bs->currentEnemy->client->ps.origin, enemyHeadPos);
+		enemyHeadPos[2] += bs->currentEnemy->client->ps.viewheight;
+
+		if (OrgVisible(bs->eye, enemyHeadPos, bs->client)) {
+			bs->frame_Enemy_Vis = 1;
+			VectorSubtract(enemyHeadPos, bs->eye, vecToTarget);
+			bs->frame_Enemy_Len = VectorLength(vecToTarget);
+			FinalAim(bs, vecToTarget, thinktime);
+			return;
+		}
 	}
+
+	bs->frame_Enemy_Vis = 0;
+	bs->frame_Enemy_Len = 0;
+
+	// 2. Else, if no visible enemy, try to aim at the next waypoint in the current path
+	if (bs->wpToGoalCount > 0 && bs->currentPathWaypointIndex < bs->wpToGoalCount) {
+		nextWp = GetWaypointByIndex(bs->wpToGoal[bs->currentPathWaypointIndex]);
+		if (nextWp) {
+			VectorCopy(nextWp->origin, targetPosition);
+			VectorSubtract(targetPosition, bs->eye, vecToTarget);
+			FinalAim(bs, vecToTarget, thinktime);
+			return;
+		}
+	}
+
+	// 3. Else, aim straight up
+	//VectorClear(bs->goalAngles); // Could clear first
+	bs->goalAngles[PITCH] = -90; // Look straight up
+	bs->goalAngles[YAW] = bs->cur_ps.viewangles[YAW]; // Maintain current yaw
+	bs->goalAngles[ROLL] = 0;
 }
 
 static void AttackEnemy(bot_state_t* bs) {
     gentity_t* bot_entity = &g_entities[bs->client];
-
-    // Ensure currentEnemy and its client are valid before dereferencing.
-    // This is a safeguard, though StandardBotAI checks IS_VALID_ENEMY before calling.
-    if (!IS_VALID_ENEMY(bs->currentEnemy)) {
-        bs->doAttack = qfalse; // Ensure bot doesn't attack if enemy becomes invalid mid-logic
-        return;
-    }
 
     // Saber power selection: Randomly switch between strong and normal attacks over time.
     if (bs->saberPowerTime < level.time) {
@@ -5868,36 +5817,33 @@ static void AttackEnemy(bot_state_t* bs) {
     }
 
     // Select saber attack animation level based on enemy health and bot's force power.
-    // Ensure bot_entity and its client are valid before accessing ps.
     if (bot_entity && bot_entity->client) {
         if (bs->currentEnemy->health > 75 && bot_entity->client->ps.fd.forcePowerLevel[FP_SABERATTACK] > 2) {
             if (bot_entity->client->ps.fd.saberAnimLevel != FORCE_LEVEL_3 && bs->saberPower) {
-                Cmd_SaberAttackCycle_f(bot_entity); // Switch to strong attack
+                Cmd_SaberAttackCycle_f(bot_entity);
             }
         } else if (bs->currentEnemy->health > 40 && bot_entity->client->ps.fd.forcePowerLevel[FP_SABERATTACK] > 1) {
             if (bot_entity->client->ps.fd.saberAnimLevel != FORCE_LEVEL_2) {
-                Cmd_SaberAttackCycle_f(bot_entity); // Switch to medium attack
+                Cmd_SaberAttackCycle_f(bot_entity);
             }
         } else {
             if (bot_entity->client->ps.fd.saberAnimLevel != FORCE_LEVEL_1) {
-                Cmd_SaberAttackCycle_f(bot_entity); // Switch to quick attack
+                Cmd_SaberAttackCycle_f(bot_entity);
             }
         }
     }
 
-    // Check if the enemy is within saber attack range.
     if (bs->frame_Enemy_Len <= SABER_ATTACK_RANGE) {
-        bs->doAttack = qtrue;
-        SaberCombatHandling(bs); // Perform saber-specific combat maneuvers/logic.
+        SaberCombatHandling(bs);
 
         // Original commented-out logic:
         // if(PrimFiring(bs)) { KeepPrimFromFiring(bs); }
         // if (bs->frame_Enemy_Len < 80) { meleestrafe = 1; }
     } else {
-        bs->doAttack = qfalse;
+		// TODO: PowTecH - probably need to shoot instead of saber but first check for vis im guessing
+        // bs->doAttack = 0;
     }
 
-    // If all conditions met and doAttack is set, execute the attack.
     if (bs->doAttack) {
         trap_EA_Attack(bs->client);
     }
